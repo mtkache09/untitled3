@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Web App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            text-align: center;
+        }
+        button {
+            background: #0088cc;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hello, Telegram!</h1>
+    <p>This is a Web App inside Telegram.</p>
+    <button onclick="sendData()">Send Data to Bot</button>
+
+    <script>
+        // Initialize Telegram WebApp
+        const tg = window.Telegram.WebApp;
+
+        // Show the Main Button (optional)
+        tg.MainButton.show().setText("Close").onClick(() => tg.close());
+
+        // Get user data
+        const user = tg.initDataUnsafe.user;
+        if (user) {
+            document.body.innerHTML += `<p>Welcome, ${user.first_name}!</p>`;
+        }
+
+        // Send data back to the bot
+        function sendData() {
+            tg.sendData(JSON.stringify({ command: "hello", from: "webapp" }));
+            tg.close();
+        }
+    </script>
+</body>
+</html>
