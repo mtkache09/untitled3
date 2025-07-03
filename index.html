@@ -65,7 +65,7 @@
             opacity: 0.7;
         }
 
-        .back-button {
+        .back-button, .open-case-button {
             display: inline-block;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -78,9 +78,10 @@
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
             cursor: pointer;
             border: none;
+            margin: 10px;
         }
 
-        .back-button:hover {
+        .back-button:hover, .open-case-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
@@ -104,6 +105,42 @@
             color: white;
         }
 
+        .case-container {
+            margin-top: 40px;
+        }
+
+        .case-image {
+            width: 200px;
+            height: 200px;
+            object-fit: contain;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .case-image:hover {
+            transform: scale(1.05);
+        }
+
+        .prize-display {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            display: none;
+        }
+
+        .prize-image {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+        }
+
+        .prize-name {
+            font-size: 1.5rem;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+
         @media (max-width: 768px) {
             .terms-container {
                 margin: 10px;
@@ -121,6 +158,11 @@
             .terms-icon {
                 font-size: 3rem;
             }
+
+            .case-image {
+                width: 150px;
+                height: 150px;
+            }
         }
     </style>
 </head>
@@ -128,6 +170,24 @@
     <div id="main-app" class="main-app">
         <h1>🎰 Casino App</h1>
         <p>Добро пожаловать в ваше казино приложение!</p>
+        
+        <div class="case-container">
+            <img src="https://cdn-icons-png.flaticon.com/512/869/869140.png" alt="Кейс" class="case-image">
+            <div>
+                <button id="open-case-btn" class="open-case-button">
+                    🎁 Открыть кейс
+                </button>
+                <button onclick="showTermsPage()" class="back-button">
+                    📋 Пользовательское соглашение
+                </button>
+            </div>
+            
+            <div id="prize-display" class="prize-display">
+                <img id="prize-image" src="" alt="Приз" class="prize-image">
+                <div id="prize-name" class="prize-name"></div>
+                <p>Поздравляем с выигрышем!</p>
+            </div>
+        </div>
     </div>
 
     <div id="terms-page" class="terms-page hidden">
