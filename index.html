@@ -146,15 +146,15 @@
                 margin: 10px;
                 padding: 30px 20px;
             }
-            
+
             .terms-header h1 {
                 font-size: 2rem;
             }
-            
+
             .placeholder-text {
                 font-size: 1.2rem;
             }
-            
+
             .terms-icon {
                 font-size: 3rem;
             }
@@ -170,7 +170,7 @@
     <div id="main-app" class="main-app">
         <h1>🎰 Casino App</h1>
         <p>Добро пожаловать в ваше казино приложение!</p>
-        
+
         <div class="case-container">
             <img src="https://cdn-icons-png.flaticon.com/512/869/869140.png" alt="Кейс" class="case-image">
             <div>
@@ -181,7 +181,7 @@
                     📋 Пользовательское соглашение
                 </button>
             </div>
-            
+
             <div id="prize-display" class="prize-display">
                 <img id="prize-image" src="" alt="Приз" class="prize-image">
                 <div id="prize-name" class="prize-name"></div>
@@ -205,7 +205,7 @@
                 <p style="color: #7f8c8d; margin-bottom: 30px;">
                     Страница находится в разработке
                 </p>
-                
+
                 <button onclick="showMainApp()" class="back-button">
                     ← Вернуться в приложение
                 </button>
@@ -222,7 +222,7 @@
             document.getElementById('main-app').classList.remove('hidden');
             document.getElementById('terms-page').classList.add('hidden');
             document.getElementById('page-title').textContent = 'Casino App';
-            
+
             history.pushState({}, '', window.location.pathname);
         }
 
@@ -235,7 +235,7 @@
         function checkPage() {
             const urlParams = new URLSearchParams(window.location.search);
             const page = urlParams.get('page');
-            
+
             if (page === 'terms') {
                 showTermsPage();
             } else {
@@ -247,5 +247,10 @@
 
         checkPage();
     </script>
+
+<script src="main.js"></script>
+
+
 </body>
 </html>
+
