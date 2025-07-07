@@ -1,74 +1,5 @@
-const cases = [
-  {
-    id: 1,
-    name: "Базовый кейс",
-    price: 50,
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 7h-9a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2z"></path><path d="M9 22V12a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9z"></path></svg>`,
-    color: "bg-gradient-to-br from-gray-600 to-gray-800",
-  },
-  {
-    id: 2,
-    name: "Серебряный кейс",
-    price: 100,
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20,6 9,17 4,12"></polyline></svg>`,
-    color: "bg-gradient-to-br from-gray-400 to-gray-600",
-  },
-  {
-    id: 3,
-    name: "Золотой кейс",
-    price: 250,
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16l-1-7H5z"></path><path d="M8 9h8"></path></svg>`,
-    color: "bg-gradient-to-br from-purple-400 to-purple-600",
-  },
-  {
-    id: 4,
-    name: "Платиновый кейс",
-    price: 500,
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 3h6l4 6 4-6h6l-8 12v6H10v-6z"></path></svg>`,
-    color: "bg-gradient-to-br from-purple-500 to-purple-700",
-  },
-  {
-    id: 5,
-    name: "Алмазный кейс",
-    price: 1000,
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3h12l4 6-10 13L2 9z"></path><path d="M11 3L8 9l4 13 4-13-3-6"></path><path d="M2 9h20"></path></svg>`,
-    color: "bg-gradient-to-br from-purple-600 to-purple-800",
-  },
-  {
-    id: 6,
-    name: "Мистический кейс",
-    price: 2000,
-    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"></polygon></svg>`,
-    color: "bg-gradient-to-br from-purple-700 to-black",
-  },
-]
-
-// Призы в черно-белых фиолетовых тонах
-const prizes = [
-  { name: "10 ⭐", color: "bg-gradient-to-br from-gray-700 to-gray-900", rarity: "common" },
-  { name: "25 ⭐", color: "bg-gradient-to-br from-gray-600 to-gray-800", rarity: "common" },
-  { name: "50 ⭐", color: "bg-gradient-to-br from-gray-500 to-gray-700", rarity: "uncommon" },
-  { name: "100 ⭐", color: "bg-gradient-to-br from-purple-900 to-black", rarity: "rare" },
-  { name: "250 ⭐", color: "bg-gradient-to-br from-purple-800 to-purple-900", rarity: "epic" },
-  { name: "500 ⭐", color: "bg-gradient-to-br from-purple-700 to-purple-800", rarity: "legendary" },
-  { name: "1000 ⭐", color: "bg-gradient-to-br from-purple-600 to-purple-700", rarity: "legendary" },
-  { name: "Джекпот!", color: "bg-gradient-to-br from-purple-500 to-purple-700", rarity: "mythic" },
-]
-
-// Варианты пополнения
-const depositAmounts = [
-  { amount: 100, bonus: 0, popular: false },
-  { amount: 250, bonus: 25, popular: false },
-  { amount: 500, bonus: 75, popular: true },
-  { amount: 1000, bonus: 200, popular: false },
-  { amount: 2500, bonus: 500, popular: false },
-  { amount: 5000, bonus: 1500, popular: false },
-]
-
-let userStars = 1250
-let currentCase = null
-let isSpinning = false
-let selectedDepositAmount = null
+// Конфигурация API для локальной разработки
+const API_BASE = "http://localhost:8000" // ✅ Для локальной разработки
 const tg = window.Telegram?.WebApp
 
 // Инициализация Telegram WebApp
@@ -78,10 +9,114 @@ if (tg) {
   tg.MainButton.hide()
 }
 
-function updateStarsDisplay() {
-  document.getElementById("userStars").textContent = userStars.toLocaleString()
-  document.getElementById("userStarsCase").textContent = userStars.toLocaleString()
-  document.getElementById("modalUserStars").textContent = userStars.toLocaleString()
+// Получаем ID пользователя из Telegram
+const getUserId = () => {
+  return tg?.initDataUnsafe?.user?.id || 12345 // Fallback для тестирования
+}
+
+// Состояние приложения
+let userFantics = 0
+let cases = []
+let currentCase = null
+let isSpinning = false
+let selectedDepositAmount = null
+
+// Варианты пополнения (в фантиках)
+const depositAmounts = [
+  { amount: 1000, bonus: 0, popular: false },
+  { amount: 2500, bonus: 250, popular: false },
+  { amount: 5000, bonus: 750, popular: true },
+  { amount: 10000, bonus: 2000, popular: false },
+  { amount: 25000, bonus: 5000, popular: false },
+  { amount: 50000, bonus: 15000, popular: false },
+]
+
+// API функции
+async function fetchUserFantics() {
+  try {
+    const response = await fetch(`${API_BASE}/fantics/${getUserId()}`)
+    if (response.ok) {
+      const data = await response.json()
+      userFantics = data.fantics
+      updateFanticsDisplay()
+    } else {
+      console.error("Ошибка получения баланса:", response.status)
+      userFantics = 0
+      updateFanticsDisplay()
+    }
+  } catch (error) {
+    console.error("Ошибка API:", error)
+    userFantics = 0
+    updateFanticsDisplay()
+  }
+}
+
+async function fetchCases() {
+  try {
+    const response = await fetch(`${API_BASE}/cases`)
+    if (response.ok) {
+      cases = await response.json()
+      renderCases()
+    }
+  } catch (error) {
+    console.error("Ошибка получения кейсов:", error)
+  }
+}
+
+async function openCaseAPI(caseId) {
+  try {
+    const response = await fetch(`${API_BASE}/open_case/${caseId}?user_id=${getUserId()}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      return result
+    } else {
+      const error = await response.json()
+      throw new Error(error.detail || "Ошибка открытия кейса")
+    }
+  } catch (error) {
+    console.error("Ошибка открытия кейса:", error)
+    throw error
+  }
+}
+
+async function addFantics(amount) {
+  try {
+    const response = await fetch(`${API_BASE}/fantics/add`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: getUserId(),
+        amount: amount,
+      }),
+    })
+
+    if (response.ok) {
+      // Обновляем баланс после задержки (для обработки через RabbitMQ)
+      setTimeout(() => {
+        fetchUserFantics()
+      }, 2000) // Увеличиваем задержку для RabbitMQ
+      return true
+    }
+    return false
+  } catch (error) {
+    console.error("Ошибка пополнения:", error)
+    return false
+  }
+}
+
+// UI функции остаются такими же...
+function updateFanticsDisplay() {
+  document.getElementById("userStars").textContent = userFantics.toLocaleString()
+  document.getElementById("userStarsCase").textContent = userFantics.toLocaleString()
+  document.getElementById("modalUserStars").textContent = userFantics.toLocaleString()
 }
 
 function updateOpenButton() {
@@ -93,7 +128,7 @@ function updateOpenButton() {
     document.getElementById("openCaseBtn").className =
       "w-full h-14 bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 text-white font-bold text-lg shadow-lg rounded-lg transition-all mb-8"
   } else {
-    openBtnText.textContent = `Открыть за ${currentCase.price} ⭐`
+    openBtnText.textContent = `Открыть за ${currentCase.cost} 💎`
     document.getElementById("openCaseBtn").className =
       "w-full h-14 bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white font-bold text-lg shadow-lg rounded-lg transition-all mb-8"
   }
@@ -104,7 +139,7 @@ function renderCases() {
   casesGrid.innerHTML = ""
 
   cases.forEach((caseItem) => {
-    const canAfford = userStars >= caseItem.price
+    const canAfford = userFantics >= caseItem.cost
 
     const caseElement = document.createElement("div")
     caseElement.className = `cursor-pointer transition-all duration-300 hover-scale bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-4 text-center ${
@@ -113,19 +148,30 @@ function renderCases() {
         : "opacity-50 cursor-not-allowed"
     }`
 
+    // Иконки для разных кейсов
+    const icons = {
+      1: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 7h-9a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2z"></path></svg>`,
+      2: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path></svg>`,
+      3: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3h12l4 6-10 13L2 9z"></path></svg>`,
+    }
+
+    const colors = {
+      1: "bg-gradient-to-br from-gray-600 to-gray-800",
+      2: "bg-gradient-to-br from-purple-400 to-purple-600",
+      3: "bg-gradient-to-br from-purple-600 to-purple-800",
+    }
+
     caseElement.innerHTML = `
-            <div class="w-16 h-16 rounded-xl ${caseItem.color} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
-                <div class="w-8 h-8 text-white">${caseItem.icon}</div>
-            </div>
-            <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
-            <div class="flex items-center justify-center gap-1">
-                <svg class="w-4 h-4 text-purple-400 fill-purple-400" viewBox="0 0 24 24">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-                <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.price.toLocaleString()}</span>
-            </div>
-            ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно звёзд</span></div>' : ""}
-        `
+      <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
+        <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
+      </div>
+      <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
+      <div class="flex items-center justify-center gap-1">
+        <span class="text-purple-400">💎</span>
+        <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
+      </div>
+      ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
+    `
 
     if (canAfford) {
       caseElement.addEventListener("click", () => openCasePage(caseItem))
@@ -148,11 +194,11 @@ function renderDepositAmounts() {
     const totalAmount = item.amount + item.bonus
 
     amountElement.innerHTML = `
-            ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
-            <div class="text-white font-bold text-lg">${item.amount} ⭐</div>
-            ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
-            ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} ⭐</div>` : ""}
-        `
+      ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
+      <div class="text-white font-bold text-lg">${item.amount} 💎</div>
+      ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
+      ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
+    `
 
     amountElement.addEventListener("click", () => selectDepositAmount(item))
     depositAmountsContainer.appendChild(amountElement)
@@ -182,10 +228,10 @@ function updateDepositButton() {
 
   if (selectedDepositAmount) {
     const totalAmount = selectedDepositAmount.amount + selectedDepositAmount.bonus
-    btnText.textContent = `Пополнить на ${totalAmount} ⭐`
+    btnText.textContent = `Пополнить на ${totalAmount} 💎`
     confirmBtn.disabled = false
   } else if (customAmount && customAmount > 0) {
-    btnText.textContent = `Пополнить на ${customAmount} ⭐`
+    btnText.textContent = `Пополнить на ${customAmount} 💎`
     confirmBtn.disabled = false
   } else {
     btnText.textContent = "Выберите сумму"
@@ -196,7 +242,7 @@ function updateDepositButton() {
 function openDepositModal() {
   document.getElementById("depositModal").classList.remove("hidden")
   renderDepositAmounts()
-  updateStarsDisplay()
+  updateFanticsDisplay()
 }
 
 function closeDepositModal() {
@@ -206,7 +252,7 @@ function closeDepositModal() {
   updateDepositButton()
 }
 
-function processDeposit() {
+async function processDeposit() {
   let amountToDeposit = 0
 
   if (selectedDepositAmount) {
@@ -223,39 +269,30 @@ function processDeposit() {
     return
   }
 
-  // Инициируем платёж через Telegram Stars
-  if (tg) {
-    // Создаем invoice для Telegram Stars
-    const invoice = {
-      title: "Пополнение Stars",
-      description: `Пополнение баланса на ${amountToDeposit} звёзд`,
-      payload: JSON.stringify({
-        type: "deposit",
-        amount: amountToDeposit,
-        user_id: tg.initDataUnsafe?.user?.id,
-      }),
-      provider_token: "", // Для Telegram Stars не нужен
-      currency: "XTR", // Telegram Stars currency
-      prices: [{ label: `${amountToDeposit} Stars`, amount: amountToDeposit }],
+  // Показываем индикатор загрузки
+  const confirmBtn = document.getElementById("confirmDepositBtn")
+  const originalText = confirmBtn.innerHTML
+  confirmBtn.innerHTML = '<span class="animate-pulse">Пополняем...</span>'
+  confirmBtn.disabled = true
+
+  try {
+    const success = await addFantics(amountToDeposit)
+
+    if (success) {
+      alert(`✅ Запрос на пополнение отправлен! Баланс обновится через несколько секунд.`)
+      closeDepositModal()
+      // Обновляем отображение через 3 секунды
+      setTimeout(() => {
+        renderCases()
+      }, 3000)
+    } else {
+      alert("❌ Ошибка при пополнении баланса")
     }
-
-    // Отправляем данные боту для создания инвойса
-    tg.sendData(
-      JSON.stringify({
-        action: "create_invoice",
-        amount: amountToDeposit,
-        selectedPackage: selectedDepositAmount,
-      }),
-    )
-
-    closeDepositModal()
-  } else {
-    // Для тестирования без Telegram
-    alert(`Пополнение на ${amountToDeposit} ⭐ (тестовый режим)`)
-    userStars += amountToDeposit
-    updateStarsDisplay()
-    renderCases()
-    closeDepositModal()
+  } catch (error) {
+    alert("❌ Ошибка при пополнении баланса")
+  } finally {
+    confirmBtn.innerHTML = originalText
+    confirmBtn.disabled = false
   }
 }
 
@@ -267,43 +304,65 @@ function openCasePage(caseData) {
   document.getElementById("caseTitle").textContent = caseData.name
   updateOpenButton()
 
-  renderPrizeScroll()
-  renderPossiblePrizes()
+  renderPrizeScroll(caseData)
+  renderPossiblePrizes(caseData)
 }
 
-function renderPrizeScroll() {
+function renderPrizeScroll(caseData) {
   const prizeScroll = document.getElementById("prizeScroll")
   prizeScroll.innerHTML = ""
 
+  // Создаем призы на основе данных кейса
+  const possibleRewards = caseData.possible_rewards
+
   // Создаем много призов для эффекта прокрутки (30 призов)
   for (let i = 0; i < 30; i++) {
-    const randomPrize = prizes[Math.floor(Math.random() * prizes.length)]
+    const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
     const prizeElement = document.createElement("div")
-    prizeElement.className = `flex-shrink-0 w-20 h-20 ${randomPrize.color} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20 transition-all duration-300`
-    prizeElement.textContent = randomPrize.name
+
+    // Цвет в зависимости от стоимости приза
+    let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
+    if (randomReward.cost >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
+    else if (randomReward.cost >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
+    else if (randomReward.cost >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
+    else if (randomReward.cost >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
+
+    prizeElement.className = `flex-shrink-0 w-20 h-20 ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20 transition-all duration-300`
+    prizeElement.textContent = `${randomReward.cost} 💎`
     prizeScroll.appendChild(prizeElement)
   }
 }
 
-function renderPossiblePrizes() {
+function renderPossiblePrizes(caseData) {
   const possiblePrizes = document.getElementById("possiblePrizes")
   possiblePrizes.innerHTML = ""
 
-  prizes.forEach((prize) => {
+  caseData.possible_rewards.forEach((reward) => {
     const prizeElement = document.createElement("div")
-    prizeElement.className = `${prize.color} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
-    prizeElement.textContent = prize.name
+
+    // Цвет в зависимости от стоимости и вероятности
+    let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
+    if (reward.cost >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
+    else if (reward.cost >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
+    else if (reward.cost >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
+    else if (reward.cost >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
+
+    prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
+    prizeElement.innerHTML = `
+      <div class="font-bold">${reward.cost} 💎</div>
+      <div class="text-xs opacity-75">${reward.probability}%</div>
+    `
     possiblePrizes.appendChild(prizeElement)
   })
 }
 
-function spinPrizes() {
+async function spinPrizes() {
   if (isSpinning) return
 
   const demoMode = document.getElementById("demoMode").checked
 
-  if (!demoMode && userStars < currentCase.price) {
-    alert("Недостаточно звёзд!")
+  if (!demoMode && userFantics < currentCase.cost) {
+    alert("Недостаточно фантиков!")
     return
   }
 
@@ -314,50 +373,67 @@ function spinPrizes() {
   openBtn.disabled = true
   openBtn.innerHTML = '<span class="animate-pulse">Открываем...</span>'
 
-  // Перегенерируем призы для случайности
-  renderPrizeScroll()
-
-  // Добавляем анимацию прокрутки
-  prizeScroll.classList.add("prize-scroll")
-
-  setTimeout(() => {
-    // Определяем выигрышный приз
-    const winningPrize = prizes[Math.floor(Math.random() * prizes.length)]
-
-    // Убираем анимацию
-    prizeScroll.classList.remove("prize-scroll")
-
-    // Находим приз в центре и подсвечиваем его
-    const centerPrize = prizeScroll.children[Math.floor(prizeScroll.children.length / 2)]
-    if (centerPrize) {
-      centerPrize.textContent = winningPrize.name
-      centerPrize.className = centerPrize.className.replace(
-        centerPrize.className.split(" ").find((c) => c.includes("bg-")),
-        winningPrize.color,
-      )
-      centerPrize.classList.add("winning-prize")
-    }
+  try {
+    let result = null
 
     if (!demoMode) {
-      userStars -= currentCase.price
-      updateStarsDisplay()
-      renderCases()
+      // Реальное открытие кейса через API
+      result = await openCaseAPI(currentCase.id)
+    } else {
+      // Демо режим - случайный приз
+      const possibleRewards = currentCase.possible_rewards
+      const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
+      result = { gift: randomReward.cost }
     }
 
-    // Показываем результат через небольшую задержку
-    setTimeout(() => {
-      alert(`🎉 Поздравляем! Вы выиграли: ${winningPrize.name}`)
+    // Перегенерируем призы для случайности
+    renderPrizeScroll(currentCase)
 
-      // Убираем подсветку
+    // Добавляем анимацию прокрутки
+    prizeScroll.classList.add("prize-scroll")
+
+    setTimeout(() => {
+      // Убираем анимацию
+      prizeScroll.classList.remove("prize-scroll")
+
+      // Находим приз в центре и показываем выигрыш
+      const centerPrize = prizeScroll.children[Math.floor(prizeScroll.children.length / 2)]
       if (centerPrize) {
-        centerPrize.classList.remove("winning-prize")
+        centerPrize.textContent = `${result.gift} 💎`
+        centerPrize.classList.add("winning-prize")
       }
 
-      openBtn.disabled = false
-      updateOpenButton()
-      isSpinning = false
-    }, 1000)
-  }, 4000) // 4 секунды анимации
+      if (!demoMode) {
+        // Обновляем баланс через 3 секунды (время обработки RabbitMQ)
+        setTimeout(() => {
+          fetchUserFantics()
+          renderCases()
+        }, 3000)
+      }
+
+      // Показываем результат через небольшую задержку
+      setTimeout(() => {
+        const profit = result.profit || 0
+        const profitText = profit > 0 ? `(+${profit} 💎)` : profit < 0 ? `(${profit} 💎)` : ""
+
+        alert(`🎉 Поздравляем! Вы выиграли: ${result.gift} 💎 ${profitText}`)
+
+        // Убираем подсветку
+        if (centerPrize) {
+          centerPrize.classList.remove("winning-prize")
+        }
+
+        openBtn.disabled = false
+        updateOpenButton()
+        isSpinning = false
+      }, 1000)
+    }, 4000) // 4 секунды анимации
+  } catch (error) {
+    alert(`❌ Ошибка: ${error.message}`)
+    openBtn.disabled = false
+    updateOpenButton()
+    isSpinning = false
+  }
 }
 
 function goBack() {
@@ -379,7 +455,6 @@ document.getElementById("confirmDepositBtn").addEventListener("click", processDe
 // Custom amount input listener
 document.getElementById("customAmount").addEventListener("input", () => {
   selectedDepositAmount = null
-  // Убираем выделение с предустановленных сумм
   document.querySelectorAll("#depositAmounts > div").forEach((el) => {
     el.classList.remove("selected-amount", "ring-2", "ring-purple-400")
   })
@@ -393,6 +468,13 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
   }
 })
 
-// Initialize
-updateStarsDisplay()
-renderCases()
+// Инициализация приложения
+async function initApp() {
+  console.log("Инициализация приложения...")
+  await fetchUserFantics()
+  await fetchCases()
+  console.log("Приложение готово!")
+}
+
+// Запуск приложения
+initApp()
