@@ -1,17 +1,29 @@
-// Конфигурация API для локальной разработки
-const API_BASE = "http://localhost:8000" // ✅ Для локальной разработки
+// 🌐 ОБНОВЛЕННАЯ версия для GitHub Pages
+// Замените API_BASE на URL вашего деплоя FastAPI
+
+// Вариант 1: Если задеплоите на Railway
+//onst API_BASE_RAILWAY = "https://your-app-name.railway.app"
+
+// Вариант 2: Если задеплоите на Render
+// const API_BASE_RENDER = "https://your-app-name.onrender.com"
+
+// Вариант 3: Если задеплоите на Fly.io
+// const API_BASE_FLY = "https://your-app-name.fly.dev"
+
+// Вариант 4: Умный выбор (рекомендуется)
+const API_BASE =
+  window.location.hostname === "localhost" ? "http://localhost:8000" : "https://your-deployed-api.railway.app" // 🔄 Замените на реальный URL
+
 const tg = window.Telegram?.WebApp
 
-// Инициализация Telegram WebApp
 if (tg) {
   tg.ready()
   tg.expand()
   tg.MainButton.hide()
 }
 
-// Получаем ID пользователя из Telegram
 const getUserId = () => {
-  return tg?.initDataUnsafe?.user?.id || 12345 // Fallback для тестирования
+  return tg?.initDataUnsafe?.user?.id || 12345
 }
 
 // Состояние приложения
@@ -21,7 +33,7 @@ let currentCase = null
 let isSpinning = false
 let selectedDepositAmount = null
 
-// Варианты пополнения (в фантиках)
+// Варианты пополнения
 const depositAmounts = [
   { amount: 1000, bonus: 0, popular: false },
   { amount: 2500, bonus: 250, popular: false },
@@ -34,32 +46,50 @@ const depositAmounts = [
 // API функции
 async function fetchUserFantics() {
   try {
+    console.log("Запрос баланса:", `${API_BASE}/fantics/${getUserId()}`)
     const response = await fetch(`${API_BASE}/fantics/${getUserId()}`)
     if (response.ok) {
       const data = await response.json()
       userFantics = data.fantics
       updateFanticsDisplay()
+      console.log("✅ Баланс получен:", userFantics)
     } else {
-      console.error("Ошибка получения баланса:", response.status)
-      userFantics = 0
-      updateFanticsDisplay()
+      console.error("❌ Ошибка получения баланса:", response.status)
+      alert("⚠️ Не удается подключиться к серверу")
     }
   } catch (error) {
-    console.error("Ошибка API:", error)
-    userFantics = 0
-    updateFanticsDisplay()
+    console.error("❌ Ошибка API:", error)
+    alert("⚠️ Сервер временно недоступен")
   }
 }
 
 async function fetchCases() {
   try {
+    console.log("Запрос кейсов:", `${API_BASE}/cases`)
     const response = await fetch(`${API_BASE}/cases`)
     if (response.ok) {
       cases = await response.json()
       renderCases()
+      console.log("✅ Кейсы загружены:", cases.length)
+    } else {
+      console.error("❌ Ошибка получения кейсов:", response.status)
     }
   } catch (error) {
-    console.error("Ошибка получения кейсов:", error)
+    console.error("❌ Ошибка получения кейсов:", error)
+    // Показываем заглушку если API недоступен
+    cases = [
+      {
+        id: 1,
+        name: "Демо кейс",
+        cost: 1000,
+        possible_rewards: [
+          { cost: 500, probability: 50 },
+          { cost: 2000, probability: 50 },
+        ],
+      },
+    ]
+    renderCases()
+    console.log("⚠️ Используются демо-данные")
   }
 }
 
@@ -99,10 +129,9 @@ async function addFantics(amount) {
     })
 
     if (response.ok) {
-      // Обновляем баланс после задержки (для обработки через RabbitMQ)
       setTimeout(() => {
         fetchUserFantics()
-      }, 2000) // Увеличиваем задержку для RabbitMQ
+      }, 1000) // Уменьшаем задержку без RabbitMQ
       return true
     }
     return false
@@ -112,7 +141,7 @@ async function addFantics(amount) {
   }
 }
 
-// UI функции остаются такими же...
+// Остальные функции UI остаются без изменений...
 function updateFanticsDisplay() {
   document.getElementById("userStars").textContent = userFantics.toLocaleString()
   document.getElementById("userStarsCase").textContent = userFantics.toLocaleString()
@@ -281,10 +310,7 @@ async function processDeposit() {
     if (success) {
       alert(`✅ Запрос на пополнение отправлен! Баланс обновится через несколько секунд.`)
       closeDepositModal()
-      // Обновляем отображение через 3 секунды
-      setTimeout(() => {
-        renderCases()
-      }, 3000)
+      renderCases() // Обновляем отображение кейсов
     } else {
       alert("❌ Ошибка при пополнении баланса")
     }
@@ -470,10 +496,13 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
 
 // Инициализация приложения
 async function initApp() {
-  console.log("Инициализация приложения...")
+  console.log("🚀 Инициализация приложения...")
+  console.log("API URL:", API_BASE)
+
   await fetchUserFantics()
   await fetchCases()
-  console.log("Приложение готово!")
+
+  console.log("✅ Приложение готово!")
 }
 
 // Запуск приложения
