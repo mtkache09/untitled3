@@ -1,17 +1,5 @@
-// 🌐 ОБНОВЛЕННАЯ версия для GitHub Pages
-// Замените API_BASE на URL вашего деплоя FastAPI
-
-// Вариант 1: Если задеплоите на Railway
-//onst API_BASE_RAILWAY = "https://your-app-name.railway.app"
-
-// Вариант 2: Если задеплоите на Render
-// const API_BASE_RENDER = "https://your-app-name.onrender.com"
-
-// Вариант 3: Если задеплоите на Fly.io
-// const API_BASE_FLY = "https://your-app-name.fly.dev"
-
-// Вариант 4: Умный выбор (рекомендуется)
-const API_BASE = window.location.hostname === "http://localhost:8000" // 🔄 Замените на реальный URL
+// ДЛЯ ЛОКАЛЬНОГО ТЕСТИРОВАНИЯ - используйте localhost
+const API_BASE = "http://localhost:8000" // 🔄 ДЛЯ ЛОКАЛЬНОГО ТЕСТИРОВАНИЯ
 
 const tg = window.Telegram?.WebApp
 
@@ -19,10 +7,19 @@ if (tg) {
   tg.ready()
   tg.expand()
   tg.MainButton.hide()
+
+  // Настройки темы для Telegram
+  tg.setHeaderColor("#1a1a2e")
+  tg.setBackgroundColor("#16213e")
 }
 
 const getUserId = () => {
-  return tg?.initDataUnsafe?.user?.id || 12345
+  // В локальном тестировании используем тестовый ID
+  if (tg?.initDataUnsafe?.user?.id) {
+    return tg.initDataUnsafe.user.id
+  }
+  // Fallback для тестирования
+  return 123456
 }
 
 // Состояние приложения
@@ -42,58 +39,117 @@ const depositAmounts = [
   { amount: 50000, bonus: 15000, popular: false },
 ]
 
-// API функции
+// Функция для показа статуса подключения
+function showConnectionStatus(message, isError = false) {
+  const statusDiv = document.getElementById("connectionStatus")
+  const statusText = document.getElementById("statusText")
+
+  statusText.textContent = message
+  statusDiv.className = `mb-4 p-3 rounded-lg text-center text-sm font-medium ${
+    isError
+      ? "bg-red-900/50 text-red-300 border border-red-700/50"
+      : "bg-blue-900/50 text-blue-300 border border-blue-700/50"
+  }`
+  statusDiv.classList.remove("hidden")
+
+  // Скрываем через 3 секунды если не ошибка
+  if (!isError) {
+    setTimeout(() => {
+      statusDiv.classList.add("hidden")
+    }, 3000)
+  }
+}
+
+// API функции с улучшенной обработкой ошибок
 async function fetchUserFantics() {
   try {
     console.log("Запрос баланса:", `${API_BASE}/fantics/${getUserId()}`)
+    showConnectionStatus("Получение баланса...")
+
     const response = await fetch(`${API_BASE}/fantics/${getUserId()}`)
     if (response.ok) {
       const data = await response.json()
       userFantics = data.fantics
       updateFanticsDisplay()
       console.log("✅ Баланс получен:", userFantics)
+      showConnectionStatus("Баланс обновлен")
     } else {
       console.error("❌ Ошибка получения баланса:", response.status)
-      alert("⚠️ Не удается подключиться к серверу")
+      showConnectionStatus("Ошибка получения баланса", true)
     }
   } catch (error) {
     console.error("❌ Ошибка API:", error)
-    alert("⚠️ Сервер временно недоступен")
+    showConnectionStatus("Сервер недоступен", true)
+    // В случае ошибки показываем демо-данные
+    userFantics = 5000
+    updateFanticsDisplay()
   }
 }
 
 async function fetchCases() {
   try {
     console.log("Запрос кейсов:", `${API_BASE}/cases`)
+    showConnectionStatus("Загрузка кейсов...")
+
     const response = await fetch(`${API_BASE}/cases`)
     if (response.ok) {
       cases = await response.json()
       renderCases()
       console.log("✅ Кейсы загружены:", cases.length)
+      showConnectionStatus(`Загружено ${cases.length} кейсов`)
     } else {
       console.error("❌ Ошибка получения кейсов:", response.status)
+      showConnectionStatus("Ошибка загрузки кейсов", true)
+      loadDemoCases()
     }
   } catch (error) {
     console.error("❌ Ошибка получения кейсов:", error)
-    // Показываем заглушку если API недоступен
-    cases = [
-      {
-        id: 1,
-        name: "Демо кейс",
-        cost: 1000,
-        possible_rewards: [
-          { cost: 500, probability: 50 },
-          { cost: 2000, probability: 50 },
-        ],
-      },
-    ]
-    renderCases()
-    console.log("⚠️ Используются демо-данные")
+    showConnectionStatus("Сервер недоступен - используются демо-данные", true)
+    loadDemoCases()
   }
+}
+
+function loadDemoCases() {
+  cases = [
+    {
+      id: 1,
+      name: "Стартовый кейс",
+      cost: 1000,
+      possible_rewards: [
+        { cost: 100, probability: 30.0 },
+        { cost: 200, probability: 50.0 },
+        { cost: 500, probability: 20.0 },
+      ],
+    },
+    {
+      id: 2,
+      name: "Премиум кейс",
+      cost: 2500,
+      possible_rewards: [
+        { cost: 500, probability: 40.0 },
+        { cost: 1000, probability: 35.0 },
+        { cost: 2000, probability: 20.0 },
+        { cost: 5000, probability: 5.0 },
+      ],
+    },
+    {
+      id: 3,
+      name: "VIP кейс",
+      cost: 10000,
+      possible_rewards: [
+        { cost: 2000, probability: 30.0 },
+        { cost: 5000, probability: 40.0 },
+        { cost: 10000, probability: 25.0 },
+        { cost: 50000, probability: 5.0 },
+      ],
+    },
+  ]
+  renderCases()
 }
 
 async function openCaseAPI(caseId) {
   try {
+    showConnectionStatus("Открытие кейса...")
     const response = await fetch(`${API_BASE}/open_case/${caseId}?user_id=${getUserId()}`, {
       method: "POST",
       headers: {
@@ -103,6 +159,7 @@ async function openCaseAPI(caseId) {
 
     if (response.ok) {
       const result = await response.json()
+      showConnectionStatus("Кейс открыт!")
       return result
     } else {
       const error = await response.json()
@@ -110,12 +167,14 @@ async function openCaseAPI(caseId) {
     }
   } catch (error) {
     console.error("Ошибка открытия кейса:", error)
+    showConnectionStatus(`Ошибка: ${error.message}`, true)
     throw error
   }
 }
 
 async function addFantics(amount) {
   try {
+    showConnectionStatus("Пополнение баланса...")
     const response = await fetch(`${API_BASE}/fantics/add`, {
       method: "POST",
       headers: {
@@ -128,19 +187,21 @@ async function addFantics(amount) {
     })
 
     if (response.ok) {
+      showConnectionStatus("Баланс пополняется...")
       setTimeout(() => {
         fetchUserFantics()
-      }, 1000) // Уменьшаем задержку без RabbitMQ
+      }, 2000) // Уменьшаем задержку для локального тестирования
       return true
     }
     return false
   } catch (error) {
     console.error("Ошибка пополнения:", error)
+    showConnectionStatus("Ошибка пополнения", true)
     return false
   }
 }
 
-// Остальные функции UI остаются без изменений...
+// Остальные функции остаются такими же...
 function updateFanticsDisplay() {
   document.getElementById("userStars").textContent = userFantics.toLocaleString()
   document.getElementById("userStarsCase").textContent = userFantics.toLocaleString()
@@ -166,6 +227,11 @@ function renderCases() {
   const casesGrid = document.getElementById("casesGrid")
   casesGrid.innerHTML = ""
 
+  if (cases.length === 0) {
+    casesGrid.innerHTML = '<div class="col-span-2 text-center text-gray-400 py-8">Кейсы загружаются...</div>'
+    return
+  }
+
   cases.forEach((caseItem) => {
     const canAfford = userFantics >= caseItem.cost
 
@@ -190,16 +256,16 @@ function renderCases() {
     }
 
     caseElement.innerHTML = `
-      <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
-        <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
-      </div>
-      <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
-      <div class="flex items-center justify-center gap-1">
-        <span class="text-purple-400">💎</span>
-        <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
-      </div>
-      ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
-    `
+            <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
+                <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
+            </div>
+            <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
+            <div class="flex items-center justify-center gap-1">
+                <span class="text-purple-400">💎</span>
+                <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
+            </div>
+            ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
+        `
 
     if (canAfford) {
       caseElement.addEventListener("click", () => openCasePage(caseItem))
@@ -222,11 +288,11 @@ function renderDepositAmounts() {
     const totalAmount = item.amount + item.bonus
 
     amountElement.innerHTML = `
-      ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
-      <div class="text-white font-bold text-lg">${item.amount} 💎</div>
-      ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
-      ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
-    `
+            ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
+            <div class="text-white font-bold text-lg">${item.amount} 💎</div>
+            ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
+            ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
+        `
 
     amountElement.addEventListener("click", () => selectDepositAmount(item))
     depositAmountsContainer.appendChild(amountElement)
@@ -374,9 +440,9 @@ function renderPossiblePrizes(caseData) {
 
     prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
     prizeElement.innerHTML = `
-      <div class="font-bold">${reward.cost} 💎</div>
-      <div class="text-xs opacity-75">${reward.probability}%</div>
-    `
+            <div class="font-bold">${reward.cost} 💎</div>
+            <div class="text-xs opacity-75">${reward.probability}%</div>
+        `
     possiblePrizes.appendChild(prizeElement)
   })
 }
@@ -429,11 +495,11 @@ async function spinPrizes() {
       }
 
       if (!demoMode) {
-        // Обновляем баланс через 3 секунды (время обработки RabbitMQ)
+        // Обновляем баланс через 2 секунды (быстрее для локального тестирования)
         setTimeout(() => {
           fetchUserFantics()
           renderCases()
-        }, 3000)
+        }, 2000)
       }
 
       // Показываем результат через небольшую задержку
@@ -497,6 +563,8 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
 async function initApp() {
   console.log("🚀 Инициализация приложения...")
   console.log("API URL:", API_BASE)
+
+  showConnectionStatus("Подключение к серверу...")
 
   await fetchUserFantics()
   await fetchCases()
