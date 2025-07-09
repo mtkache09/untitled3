@@ -11,9 +11,7 @@
 // const API_BASE_FLY = "https://your-app-name.fly.dev"
 
 // Вариант 4: Умный выбор (рекомендуется)
-const API_BASE = window.location.hostname === "localhost"
-  ? "http://localhost:8000"
-  : "http://your-server-ip-or-domain:8000"// 🔄 Замените на реальный URL
+const API_BASE = window.location.hostname === "http://localhost:8000" // 🔄 Замените на реальный URL
 
 const tg = window.Telegram?.WebApp
 
