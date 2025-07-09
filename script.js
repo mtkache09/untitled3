@@ -1,5 +1,12 @@
-// ДЛЯ ЛОКАЛЬНОГО ТЕСТИРОВАНИЯ - используйте localhost
-const API_BASE = "http://localhost:8000" // 🔄 ДЛЯ ЛОКАЛЬНОГО ТЕСТИРОВАНИЯ
+// Умное определение API URL
+const API_BASE = (() => {
+  // Если в продакшене (GitHub Pages), используем Railway URL
+  if (window.location.hostname === "mtkache09.github.io") {
+    return "https://ваш-railway-домен.railway.app" // 🔄 ЗАМЕНИТЕ НА ВАШ RAILWAY URL
+  }
+  // Для локального тестирования
+  return "http://localhost:8000"
+})()
 
 const tg = window.Telegram?.WebApp
 
@@ -14,13 +21,16 @@ if (tg) {
 }
 
 const getUserId = () => {
-  // В локальном тестировании используем тестовый ID
+  // В продакшене используем реальный ID пользователя
   if (tg?.initDataUnsafe?.user?.id) {
     return tg.initDataUnsafe.user.id
   }
   // Fallback для тестирования
   return 123456
 }
+
+// Остальной код остается таким же...
+// [Весь остальной JavaScript код из предыдущей версии]
 
 // Состояние приложения
 let userFantics = 0
@@ -188,9 +198,11 @@ async function addFantics(amount) {
 
     if (response.ok) {
       showConnectionStatus("Баланс пополняется...")
+      // В продакшене (RabbitMQ) ждем дольше, в DEV режиме - быстрее
+      const delay = API_BASE.includes("localhost") ? 1000 : 3000
       setTimeout(() => {
         fetchUserFantics()
-      }, 2000) // Уменьшаем задержку для локального тестирования
+      }, delay)
       return true
     }
     return false
@@ -201,7 +213,7 @@ async function addFantics(amount) {
   }
 }
 
-// Остальные функции остаются такими же...
+// Остальные функции остаются такими же как в предыдущей версии...
 function updateFanticsDisplay() {
   document.getElementById("userStars").textContent = userFantics.toLocaleString()
   document.getElementById("userStarsCase").textContent = userFantics.toLocaleString()
@@ -256,16 +268,16 @@ function renderCases() {
     }
 
     caseElement.innerHTML = `
-            <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
-                <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
-            </div>
-            <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
-            <div class="flex items-center justify-center gap-1">
-                <span class="text-purple-400">💎</span>
-                <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
-            </div>
-            ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
-        `
+              <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
+                  <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
+              </div>
+              <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
+              <div class="flex items-center justify-center gap-1">
+                  <span class="text-purple-400">💎</span>
+                  <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
+              </div>
+              ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
+          `
 
     if (canAfford) {
       caseElement.addEventListener("click", () => openCasePage(caseItem))
@@ -288,11 +300,11 @@ function renderDepositAmounts() {
     const totalAmount = item.amount + item.bonus
 
     amountElement.innerHTML = `
-            ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
-            <div class="text-white font-bold text-lg">${item.amount} 💎</div>
-            ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
-            ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
-        `
+              ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
+              <div class="text-white font-bold text-lg">${item.amount} 💎</div>
+              ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
+              ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
+          `
 
     amountElement.addEventListener("click", () => selectDepositAmount(item))
     depositAmountsContainer.appendChild(amountElement)
@@ -440,9 +452,9 @@ function renderPossiblePrizes(caseData) {
 
     prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
     prizeElement.innerHTML = `
-            <div class="font-bold">${reward.cost} 💎</div>
-            <div class="text-xs opacity-75">${reward.probability}%</div>
-        `
+              <div class="font-bold">${reward.cost} 💎</div>
+              <div class="text-xs opacity-75">${reward.probability}%</div>
+          `
     possiblePrizes.appendChild(prizeElement)
   })
 }
@@ -495,11 +507,12 @@ async function spinPrizes() {
       }
 
       if (!demoMode) {
-        // Обновляем баланс через 2 секунды (быстрее для локального тестирования)
+        // Обновляем баланс - в продакшене ждем дольше (RabbitMQ), в DEV быстрее
+        const delay = API_BASE.includes("localhost") ? 1000 : 3000
         setTimeout(() => {
           fetchUserFantics()
           renderCases()
-        }, 2000)
+        }, delay)
       }
 
       // Показываем результат через небольшую задержку
