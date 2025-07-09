@@ -12,7 +12,7 @@
 
 // Вариант 4: Умный выбор (рекомендуется)
 const API_BASE =
-  window.location.hostname === "localhost" ? "http://localhost:8000" : "https://your-deployed-api.railway.app" // 🔄 Замените на реальный URL
+  window.location.hostname === "localhost" ? "http://localhost:8000" : "https://casino2-production-6824.up.railway.app" // 🔄 Замените на реальный URL
 
 const tg = window.Telegram?.WebApp
 
