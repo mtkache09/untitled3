@@ -316,8 +316,6 @@ function renderCases() {
 
     if (canAfford) {
       caseElement.addEventListener("click", () => openCasePage(caseItem))
-    if (canAfford) {
-      caseElement.addEventListener("click", () => openCasePage(caseItem))
     }
 
     casesGrid.appendChild(caseElement)
@@ -343,24 +341,23 @@ function renderDepositAmounts() {
               ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
           `
 
-    amountElement.addEventListener("click", () => selectDepositAmount(item))
+    amountElement.addEventListener("click", (e) => selectDepositAmount(item, e))
     depositAmountsContainer.appendChild(amountElement)
   })
 }
 
-function selectDepositAmount(item) {
+function selectDepositAmount(item, event) { 
   selectedDepositAmount = item
   updateDepositButton()
 
-  // Убираем выделение с других элементов
   document.querySelectorAll("#depositAmounts > div").forEach((el) => {
     el.classList.remove("selected-amount", "ring-2", "ring-purple-400")
   })
 
-  // Выделяем выбранный элемент
-  event.target.closest("div").classList.add("selected-amount", "ring-2", "ring-purple-400")
+  if (event && event.target) {
+    event.target.closest("div").classList.add("selected-amount", "ring-2", "ring-purple-400")
+  }
 
-  // Очищаем кастомное поле
   document.getElementById("customAmount").value = ""
 }
 
