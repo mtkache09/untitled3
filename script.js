@@ -2,7 +2,7 @@
 const API_BASE = (() => {
   // Если в продакшене (GitHub Pages), используем Railway URL
   if (window.location.hostname === "mtkache09.github.io") {
-    return "https://ваш-railway-домен.railway.app" // 🔄 ЗАМЕНИТЕ НА ВАШ RAILWAY URL
+    return "https://casino2-production-6824.up.railway.app" 
   }
   // Для локального тестирования
   return "http://localhost:8000"
