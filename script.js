@@ -615,3 +615,10 @@ async function initApp() {
   console.log("API URL:", API_BASE)
 
   showConnectionStatus("Подключение к серверу...")
+  await fetchUserFantics()
+  await fetchCases()
+
+  console.log("✅ Приложение готово!")
+}
+
+initApp()
