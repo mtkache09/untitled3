@@ -1,6 +1,6 @@
 const API_BASE = (() => {
   if (window.location.hostname === "mtkache09.github.io") {
-    return "https://casino2-production-6824.up.railway.app" 
+    return "https://telegramcases-production.up.railway.app" 
   }
   return "http://localhost:8000"
 })()
