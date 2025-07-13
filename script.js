@@ -25,6 +25,32 @@ if (tg) {
   tg.setBackgroundColor("#16213e")
 }
 
+// Функция для получения авторизационных заголовков
+function getAuthHeaders() {
+  const headers = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  }
+
+  // Проверяем доступность Telegram WebApp
+  if (window.Telegram?.WebApp?.initData) {
+    headers["Authorization"] = `tgWebAppData ${window.Telegram.WebApp.initData}`
+    console.log("✅ Используем Telegram WebApp авторизацию")
+  } else {
+    console.warn("⚠️ Telegram WebApp недоступен, используем тестовый режим")
+    // В тестовом режиме можно добавить альтернативную авторизацию
+    // headers['X-Test-Auth'] = 'test-mode'
+  }
+
+  return headers
+}
+
+// Функция для проверки доступности Telegram WebApp
+function isTelegramWebApp() {
+  return !!window.Telegram?.WebApp?.initData
+}
+
+// Улучшенная функция получения User ID
 const getUserId = () => {
   if (tg?.initDataUnsafe?.user?.id) {
     const userId = tg.initDataUnsafe.user.id
@@ -33,6 +59,31 @@ const getUserId = () => {
   }
   console.warn("⚠️ Telegram User ID не найден, используем тестовый: 123456")
   return 123456
+}
+
+// Функция для обработки ошибок API
+function handleApiError(response, error) {
+  switch (response?.status) {
+    case 401:
+      showNotification("❌ Ошибка авторизации. Перезапустите приложение", "error", 5000)
+      console.error("401 Unauthorized:", error)
+      break
+    case 403:
+      showNotification("❌ Доступ запрещен", "error")
+      console.error("403 Forbidden:", error)
+      break
+    case 404:
+      showNotification("❌ Ресурс не найден", "error")
+      console.error("404 Not Found:", error)
+      break
+    case 500:
+      showNotification("❌ Ошибка сервера", "error")
+      console.error("500 Server Error:", error)
+      break
+    default:
+      showNotification(`❌ Ошибка: ${error?.message || "Неизвестная ошибка"}`, "error")
+      console.error("API Error:", error)
+  }
 }
 
 let userFantics = 0
@@ -49,6 +100,31 @@ const depositAmounts = [
   { amount: 25000, bonus: 5000, popular: false },
   { amount: 50000, bonus: 15000, popular: false },
 ]
+
+// Функция для показа красивых уведомлений вместо alert
+function showNotification(message, type = "info", duration = 3000) {
+  // Удаляем предыдущие уведомления
+  const existingNotifications = document.querySelectorAll(".notification")
+  existingNotifications.forEach((notification) => {
+    notification.remove()
+  })
+
+  const notification = document.createElement("div")
+  notification.className = `notification ${type}`
+  notification.textContent = message
+
+  document.body.appendChild(notification)
+
+  // Автоматически скрываем уведомление
+  setTimeout(() => {
+    notification.classList.add("hide")
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.remove()
+      }
+    }, 300)
+  }, duration)
+}
 
 function showConnectionStatus(message, isError = false) {
   const statusDiv = document.getElementById("connectionStatus")
@@ -78,16 +154,14 @@ async function fetchUserFantics() {
     console.log("   URL:", url)
     console.log("   User ID:", userId)
     console.log("   API Base:", API_BASE)
+    console.log("   Telegram WebApp доступен:", isTelegramWebApp())
 
     showConnectionStatus("Получение баланса...")
 
     const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      mode: 'cors'
+      method: "GET",
+      headers: getAuthHeaders(),
+      mode: "cors",
     })
 
     console.log("📡 Ответ сервера:", response.status, response.statusText)
@@ -100,15 +174,22 @@ async function fetchUserFantics() {
       console.log("✅ Баланс получен:", userFantics)
       showConnectionStatus("Баланс обновлен")
     } else {
-      const errorText = await response.text()
-      console.error("❌ Ошибка получения баланса:", response.status, errorText)
+      const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
+      console.error("❌ Ошибка получения баланса:", response.status, errorData)
+      handleApiError(response, errorData)
       showConnectionStatus("Ошибка получения баланса", true)
     }
   } catch (error) {
     console.error("❌ Ошибка API:", error)
     console.error("   Тип ошибки:", error.name)
     console.error("   Сообщение:", error.message)
-    showConnectionStatus("Сервер недоступен", true)
+
+    if (!isTelegramWebApp()) {
+      showConnectionStatus("Доступно только в Telegram WebApp", true)
+      showNotification("⚠️ Приложение работает только в Telegram", "error", 5000)
+    } else {
+      showConnectionStatus("Сервер недоступен", true)
+    }
 
     // В случае ошибки показываем нулевой баланс
     userFantics = 0
@@ -123,12 +204,9 @@ async function fetchCases() {
     showConnectionStatus("Загрузка кейсов...")
 
     const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      mode: 'cors'
+      method: "GET",
+      headers: getAuthHeaders(),
+      mode: "cors",
     })
 
     console.log("📡 Ответ сервера (кейсы):", response.status)
@@ -136,22 +214,24 @@ async function fetchCases() {
     if (response.ok) {
       const rawCases = await response.json()
       console.log("📡 Сырые данные кейсов:", rawCases)
-      
+
       // Преобразуем новый формат в старый для совместимости
-      cases = rawCases.map(caseData => ({
+      cases = rawCases.map((caseData) => ({
         ...caseData,
-        possible_rewards: caseData.presents.map(present => ({
+        possible_rewards: caseData.presents.map((present) => ({
           cost: present.cost,
-          probability: present.probability
-        }))
+          probability: present.probability,
+        })),
       }))
-      
+
       console.log("📡 Преобразованные кейсы:", cases)
       renderCases()
       console.log("✅ Кейсы загружены:", cases.length)
       showConnectionStatus(`Загружено ${cases.length} кейсов`)
     } else {
-      console.error("❌ Ошибка получения кейсов:", response.status)
+      const errorData = await response.json().catch(() => ({ detail: "Ошибка загрузки кейсов" }))
+      console.error("❌ Ошибка получения кейсов:", response.status, errorData)
+      handleApiError(response, errorData)
       showConnectionStatus("Ошибка загрузки кейсов", true)
       // Показываем пустой список кейсов
       cases = []
@@ -171,24 +251,32 @@ async function testConnection() {
   console.log("=== ТЕСТ СОЕДИНЕНИЯ С API ===")
   console.log("API Base:", API_BASE)
   console.log("User ID:", getUserId())
+  console.log("Telegram WebApp доступен:", isTelegramWebApp())
+  console.log("Init Data:", window.Telegram?.WebApp?.initData ? "Есть" : "Нет")
 
   try {
     // Тест 1: Проверка основного API
     console.log("📡 Тест 1: Проверка /")
-    const response1 = await fetch(`${API_BASE}/`)
+    const response1 = await fetch(`${API_BASE}/`, {
+      headers: getAuthHeaders(),
+    })
     const data1 = await response1.json()
     console.log("✅ Основной API:", data1)
 
     // Тест 2: Проверка fantics
     console.log("📡 Тест 2: Проверка /fantics/")
     const userId = getUserId()
-    const response2 = await fetch(`${API_BASE}/fantics/${userId}`)
+    const response2 = await fetch(`${API_BASE}/fantics/${userId}`, {
+      headers: getAuthHeaders(),
+    })
     const data2 = await response2.json()
     console.log("✅ Fantics endpoint:", data2)
 
     // Тест 3: Проверка кейсов
     console.log("📡 Тест 3: Проверка /cases")
-    const response3 = await fetch(`${API_BASE}/cases`)
+    const response3 = await fetch(`${API_BASE}/cases`, {
+      headers: getAuthHeaders(),
+    })
     const data3 = await response3.json()
     console.log("✅ Cases endpoint:", data3)
   } catch (error) {
@@ -202,18 +290,20 @@ async function openCaseAPI(caseId) {
     const url = `${API_BASE}/open_case/${caseId}`
 
     console.log("📡 Открытие кейса:", url)
+    console.log("   User ID:", userId)
+    console.log("   Case ID:", caseId)
     showConnectionStatus("Открытие кейса...")
 
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
-        user_id: userId
+        user_id: userId,
       }),
-      mode: 'cors'
+      mode: "cors",
     })
+
+    console.log("📡 Ответ сервера (открытие кейса):", response.status)
 
     if (response.ok) {
       const result = await response.json()
@@ -221,8 +311,10 @@ async function openCaseAPI(caseId) {
       showConnectionStatus("Кейс открыт!")
       return result
     } else {
-      const error = await response.json()
-      throw new Error(error.detail || "Ошибка открытия кейса")
+      const errorData = await response.json().catch(() => ({ detail: "Ошибка открытия кейса" }))
+      console.error("❌ Ошибка открытия кейса:", response.status, errorData)
+      handleApiError(response, errorData)
+      throw new Error(errorData.detail || "Ошибка открытия кейса")
     }
   } catch (error) {
     console.error("❌ Ошибка открытия кейса:", error)
@@ -235,19 +327,25 @@ async function addFantics(amount) {
   try {
     const userId = getUserId()
     console.log("📡 Пополнение баланса:", amount, "для пользователя:", userId)
+
+    // Проверяем доступность Telegram WebApp для операций с деньгами
+    if (!isTelegramWebApp()) {
+      throw new Error("Пополнение доступно только в Telegram WebApp")
+    }
+
     showConnectionStatus("Пополнение баланса...")
 
     const response = await fetch(`${API_BASE}/fantics/add`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         user_id: userId,
         amount: amount,
       }),
-      mode: 'cors'
+      mode: "cors",
     })
+
+    console.log("📡 Ответ сервера (пополнение):", response.status)
 
     if (response.ok) {
       const result = await response.json()
@@ -258,11 +356,16 @@ async function addFantics(amount) {
         fetchUserFantics()
       }, delay)
       return true
+    } else {
+      const errorData = await response.json().catch(() => ({ detail: "Ошибка пополнения" }))
+      console.error("❌ Ошибка пополнения:", response.status, errorData)
+      handleApiError(response, errorData)
+      return false
     }
-    return false
   } catch (error) {
     console.error("❌ Ошибка пополнения:", error)
     showConnectionStatus("Ошибка пополнения", true)
+    showNotification(`❌ ${error.message}`, "error")
     return false
   }
 }
@@ -422,7 +525,7 @@ async function processDeposit() {
   }
 
   if (amountToDeposit <= 0) {
-    alert("Выберите сумму для пополнения")
+    showNotification("Выберите сумму для пополнения", "error")
     return
   }
 
@@ -435,14 +538,14 @@ async function processDeposit() {
     const success = await addFantics(amountToDeposit)
 
     if (success) {
-      alert(`✅ Запрос на пополнение отправлен! Баланс обновится через несколько секунд.`)
+      showNotification(`✅ Запрос на пополнение отправлен! Баланс обновится через несколько секунд.`, "success", 4000)
       closeDepositModal()
       renderCases()
     } else {
-      alert("❌ Ошибка при пополнении баланса")
+      showNotification("❌ Ошибка при пополнении баланса", "error")
     }
   } catch (error) {
-    alert("❌ Ошибка при пополнении баланса")
+    showNotification("❌ Ошибка при пополнении баланса", "error")
   } finally {
     confirmBtn.innerHTML = originalText
     confirmBtn.disabled = false
@@ -511,7 +614,7 @@ async function spinPrizes() {
   const demoMode = document.getElementById("demoMode").checked
 
   if (!demoMode && userFantics < currentCase.cost) {
-    alert("Недостаточно фантиков!")
+    showNotification("Недостаточно фантиков!", "error")
     return
   }
 
@@ -533,19 +636,24 @@ async function spinPrizes() {
       result = { gift: randomReward.cost }
     }
 
+    // Перегенерируем призы для новой анимации
     renderPrizeScroll(currentCase)
 
+    // Запускаем анимацию прокрутки
     prizeScroll.classList.add("prize-scroll")
 
+    // Ждем окончания анимации (3 секунды)
     setTimeout(() => {
       prizeScroll.classList.remove("prize-scroll")
 
+      // Находим центральный приз и устанавливаем выигрышное значение
       const centerPrize = prizeScroll.children[Math.floor(prizeScroll.children.length / 2)]
       if (centerPrize) {
         centerPrize.textContent = `${result.gift} 💎`
         centerPrize.classList.add("winning-prize")
       }
 
+      // Обновляем баланс если не демо режим
       if (!demoMode) {
         const delay = API_BASE.includes("localhost") ? 1000 : 3000
         setTimeout(() => {
@@ -554,23 +662,28 @@ async function spinPrizes() {
         }, delay)
       }
 
+      // Показываем результат через секунду после остановки
       setTimeout(() => {
         const profit = result.profit || 0
         const profitText = profit > 0 ? `(+${profit} 💎)` : profit < 0 ? `(${profit} 💎)` : ""
 
-        alert(`🎉 Поздравляем! Вы выиграли: ${result.gift} 💎 ${profitText}`)
+        showNotification(`🎉 Поздравляем! Вы выиграли: ${result.gift} 💎 ${profitText}`, "success", 5000)
 
+        // Убираем эффект свечения
         if (centerPrize) {
           centerPrize.classList.remove("winning-prize")
         }
 
+        // Возвращаем кнопку в нормальное состояние
         openBtn.disabled = false
         updateOpenButton()
         isSpinning = false
       }, 1000)
-    }, 4000)
+    }, 3000) // Время анимации прокрутки
   } catch (error) {
-    alert(`❌ Ошибка: ${error.message}`)
+    showNotification(`❌ Ошибка: ${error.message}`, "error")
+
+    // В случае ошибки также возвращаем кнопку в нормальное состояние
     openBtn.disabled = false
     updateOpenButton()
     isSpinning = false
@@ -610,6 +723,16 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
 async function initApp() {
   console.log("🚀 Инициализация приложения...")
   console.log("API URL:", API_BASE)
+  console.log("Telegram WebApp статус:", isTelegramWebApp() ? "✅ Доступен" : "❌ Недоступен")
+
+  if (window.Telegram?.WebApp?.initData) {
+    console.log("📱 Init Data длина:", window.Telegram.WebApp.initData.length)
+  }
+
+  // Показываем предупреждение если не в Telegram
+  if (!isTelegramWebApp()) {
+    showNotification("⚠️ Для полной функциональности откройте в Telegram", "info", 8000)
+  }
 
   showConnectionStatus("Подключение к серверу...")
   await fetchUserFantics()
