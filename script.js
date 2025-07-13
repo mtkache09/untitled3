@@ -788,7 +788,7 @@ async function spinPrizes() {
 
       // Запрашиваем актуальный баланс с сервера после небольшой задержки
       // Это обеспечит конечную согласованность, особенно при использовании RabbitMQ
-      const delay = API_BASE.includes("localhost") ? 1000 : 6000 // Увеличена задержка для продакшна
+      const delay = API_BASE.includes("localhost") ? 1000 : 8000 // Увеличена задержка для продакшна до 8 секунд
       console.log(`DEBUG: Задержка перед fetchUserFantics: ${delay}ms`)
       setTimeout(() => {
         fetchUserFantics() // Это обновит баланс с сервера
