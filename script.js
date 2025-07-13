@@ -672,7 +672,7 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     if (i === targetWinningIndex) {
       // Вставляем фактический выигрышный приз в целевую позицию
       rewardValue = winningGiftCost
-      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`)
+      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целев��й).`)
     } else {
       let randomReward
       let attempts = 0
@@ -829,7 +829,7 @@ async function spinPrizes() {
         { transform: `translateX(-${totalScrollDistance}px)` }, // Конечное состояние
       ],
       {
-        duration: 8000, // Откат длительности до 8 секунд
+        duration: 10000, // Увеличена длительность до 10 секунд
         easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Та же кривая ускорения
         fill: "forwards", // Сохранить конечное состояние после завершения
       },
