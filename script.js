@@ -707,6 +707,7 @@ async function spinPrizes() {
   const initialBalanceBeforeSpin = userFantics // Сохраняем баланс до начала операции
 
   let winningElement = null // Объявляем здесь, чтобы был доступен в finally
+  let animationFrameId // Для отслеживания requestAnimationFrame
 
   try {
     let result = null
@@ -782,6 +783,51 @@ async function spinPrizes() {
         fill: "forwards", // Сохранить конечное состояние после завершения
       },
     )
+
+    // === НАЧАЛО МОНИТОРИНГА АНИМАЦИИ ===
+    const logInterval = 100 // Логировать каждые 100 мс
+    let lastLogTime = 0
+
+    const monitorAnimation = (currentTime) => {
+      if (!isSpinning) return // Остановить мониторинг, если спин завершен
+
+      if (currentTime - lastLogTime > logInterval) {
+        lastLogTime = currentTime
+
+        const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
+        let currentTranslateX = 0
+        const matrixMatch = currentTransformStyle.match(
+          /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/,
+        )
+        if (matrixMatch && matrixMatch.length >= 6) {
+          currentTranslateX = Number.parseFloat(matrixMatch[5])
+        } else {
+          const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
+          if (translateXMatch && translateXMatch[1]) {
+            currentTranslateX = Number.parseFloat(translateXMatch[1])
+          }
+        }
+
+        const winningElementRect = winningElement.getBoundingClientRect()
+        const viewportRect = viewport.getBoundingClientRect()
+
+        // Позиция центра выигрышного элемента относительно левого края viewport
+        const currentWinningElementCenterInViewport =
+          winningElementRect.left + winningElementRect.width / 2 - viewportRect.left
+
+        const desiredViewportCenter = viewportRect.width / 2
+        const distanceToCenter = currentWinningElementCenterInViewport - desiredViewportCenter
+
+        console.log(
+          `DEBUG: Анимация - Приз ${winningElement.textContent} | Текущий translateX: ${currentTranslateX.toFixed(2)}px | Расстояние до центра: ${distanceToCenter.toFixed(2)}px`,
+        )
+      }
+
+      animationFrameId = requestAnimationFrame(monitorAnimation)
+    }
+
+    animationFrameId = requestAnimationFrame(monitorAnimation)
+    // === КОНЕЦ МОНИТОРИНГА АНИМАЦИИ ===
 
     // Ждем точного завершения анимации
     await animation.finished
@@ -943,6 +989,10 @@ async function spinPrizes() {
     // Этот блок всегда выполняется, независимо от ошибок, для сброса UI
     if (winningElement) {
       winningElement.classList.remove("winning-prize")
+    }
+    // Отменяем мониторинг анимации
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId)
     }
     // WAAPI с fill: 'forwards' уже держит конечное состояние, поэтому явный сброс transform не нужен
     // prizeScroll.style.transform = "translateX(0px)"
