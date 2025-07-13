@@ -724,6 +724,7 @@ async function spinPrizes() {
 
   let winningElement = null // Объявляем здесь, чтобы был доступен в finally
   let animationFrameId // Для отслеживания requestAnimationFrame
+  let animation // Объявляем здесь, чтобы был доступен в monitorAnimation
 
   try {
     let result = null
@@ -762,25 +763,33 @@ async function spinPrizes() {
 
     const firstItem = prizeScroll.children[0]
     const itemWidth = firstItem.offsetWidth
-    const computedStyle = window.getComputedStyle(firstItem)
-    const marginRight = Number.parseFloat(computedStyle.marginRight)
-    const effectiveItemWidth = itemWidth + marginRight
+    // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
+    const gapValue = 16 // Tailwind's gap-4 is 16px
+
+    // Корректный расчет эффективной ширины элемента, включая gap
+    const effectiveItemWidth = itemWidth + gapValue
+
+    console.log("DEBUG: Measured itemWidth:", itemWidth)
+    console.log("DEBUG: Hardcoded gapValue:", gapValue) // Изменено
+    console.log("DEBUG: Effective item width (corrected):", effectiveItemWidth) // Изменено
 
     const winningElementCenterPosition = winningElement.offsetLeft + winningElement.offsetWidth / 2
     const desiredScrollPosition = winningElementCenterPosition - viewportWidth / 2
 
     const extraFullSpins = 5
-    const totalScrollDistance = desiredScrollPosition + extraFullSpins * viewportWidth
+    // totalScrollDistance теперь использует корректный effectiveItemWidth
+    const totalScrollDistance =
+      desiredScrollPosition + extraFullSpins * prizeScroll.children.length * effectiveItemWidth
 
-    console.log("DEBUG: Measured itemWidth:", itemWidth)
-    console.log("DEBUG: Measured marginRight:", marginRight)
-    console.log("DEBUG: Effective item width:", effectiveItemWidth)
     console.log("DEBUG: winningElement.offsetLeft:", winningElement.offsetLeft)
     console.log("DEBUG: winningElement.offsetWidth:", winningElement.offsetWidth)
     console.log("DEBUG: winningElementCenterPosition:", winningElementCenterPosition)
     console.log("DEBUG: viewportWidth:", viewportWidth)
     console.log("DEBUG: desiredScrollPosition:", desiredScrollPosition)
-    console.log("DEBUG: extraFullSpins * viewportWidth:", extraFullSpins * viewportWidth)
+    console.log(
+      "DEBUG: extraFullSpins * prizeScroll.children.length * effectiveItemWidth:",
+      extraFullSpins * prizeScroll.children.length * effectiveItemWidth,
+    ) // Изменено
     console.log("DEBUG: totalScrollDistance (calculated):", totalScrollDistance)
 
     // === НАЧАЛО ИЗМЕНЕНИЙ ДЛЯ WAAPI ===
@@ -788,7 +797,8 @@ async function spinPrizes() {
     prizeScroll.style.transform = "translateX(0px)"
     prizeScroll.offsetHeight // Принудительная перерисовка для применения сброса
 
-    const animation = prizeScroll.animate(
+    animation = prizeScroll.animate(
+      // Присваиваем переменной animation
       [
         { transform: "translateX(0px)" }, // Начальное состояние
         { transform: `translateX(-${totalScrollDistance}px)` }, // Конечное состояние
@@ -805,24 +815,19 @@ async function spinPrizes() {
     let lastLogTime = 0
 
     const monitorAnimation = (currentTime) => {
-      if (!isSpinning) return // Остановить мониторинг, если спин завершен
+      if (!isSpinning || animation.playState === "finished") {
+        // Остановить мониторинг, если спин завершен или анимация завершена
+        cancelAnimationFrame(animationFrameId)
+        return
+      }
 
       if (currentTime - lastLogTime > logInterval) {
         lastLogTime = currentTime
 
-        const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
-        let currentTranslateX = 0
-        const matrixMatch = currentTransformStyle.match(
-          /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/,
-        )
-        if (matrixMatch && matrixMatch.length >= 6) {
-          currentTranslateX = Number.parseFloat(matrixMatch[5])
-        } else {
-          const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
-          if (translateXMatch && translateXMatch[1]) {
-            currentTranslateX = Number.parseFloat(translateXMatch[1])
-          }
-        }
+        // Получаем текущий прогресс анимации
+        const animationProgress = animation.currentTime / animation.effect.getComputedTiming().duration
+        // Вычисляем текущий translateX на основе прогресса и totalScrollDistance
+        const currentTranslateX = animationProgress * -totalScrollDistance
 
         const winningElementRect = winningElement.getBoundingClientRect()
         const viewportRect = viewport.getBoundingClientRect()
@@ -835,7 +840,7 @@ async function spinPrizes() {
         const distanceToCenter = currentWinningElementCenterInViewport - desiredViewportCenter
 
         console.log(
-          `DEBUG: Анимация - Приз ${winningElement.textContent} | Текущий translateX: ${currentTranslateX.toFixed(2)}px | Расстояние до центра: ${distanceToCenter.toFixed(2)}px`,
+          `DEBUG: Анимация - Приз ${winningElement.textContent} | Прогресс: ${(animationProgress * 100).toFixed(2)}% | Расчетный translateX: ${currentTranslateX.toFixed(2)}px | Расстояние до центра: ${distanceToCenter.toFixed(2)}px`,
         )
       }
 
@@ -881,8 +886,6 @@ async function spinPrizes() {
       const offsetToCenter = currentWinningElementCenterInViewport - desiredViewportCenter
 
       // Get the current transform value directly from the element's style (set by WAAPI)
-      // WAAPI sets the final transform directly on style, so getComputedStyle might not be needed for this.
-      // However, getComputedStyle is safer for cross-browser consistency if WAAPI doesn't always set style.transform immediately.
       const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
       let currentTranslateX = 0
 
@@ -892,6 +895,7 @@ async function spinPrizes() {
         /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/,
       )
       if (matrixMatch && matrixMatch.length >= 6) {
+        console.log("DEBUG: matrixMatch[5] for snap correction:", matrixMatch[5]) // Добавлен лог
         currentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
         console.log("DEBUG: Parsed from matrix (currentTranslateX):", currentTranslateX)
       } else {
