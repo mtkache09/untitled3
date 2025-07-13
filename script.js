@@ -780,6 +780,7 @@ async function spinPrizes() {
       winningElement.classList.add("winning-prize")
       console.log("DEBUG: Визуально выделенный приз (из DOM):", winningElement.textContent)
       console.log("DEBUG: Ожидаемый выигрышный приз (из API):", result.gift)
+      showNotification(`🎉 Вы выиграли ${result.gift} 💎!`, "success", 3000) // Добавлено уведомление
     }
 
     // === НАЧАЛО ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ (SNAP CORRECTION) ===
@@ -888,7 +889,7 @@ async function spinPrizes() {
     // === КОНЕЦ ИЗМЕНЕНИЙ ДЛЯ ПОЛЛИНГА ===
 
     // Ждем завершения свечения приза
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 2000))
     console.log("DEBUG: Свечение приза завершено.")
   } catch (error) {
     showNotification(`❌ Ошибка: ${error.message}`, "error")
