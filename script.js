@@ -470,16 +470,16 @@ function renderCases() {
     }
 
     caseElement.innerHTML = `
-          <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
-              <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
-          </div>
-          <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
-          <div class="flex items-center justify-center gap-1">
-              <span class="text-purple-400">💎</span>
-              <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
-          </div>
-          ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
-      `
+        <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
+            <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
+        </div>
+        <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
+        <div class="flex items-center justify-center gap-1">
+            <span class="text-purple-400">💎</span>
+            <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
+        </div>
+        ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
+    `
 
     if (canAfford) {
       caseElement.addEventListener("click", () => openCasePage(caseItem))
@@ -502,11 +502,11 @@ function renderDepositAmounts() {
     const totalAmount = item.amount + item.bonus
 
     amountElement.innerHTML = `
-          ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
-          <div class="text-white font-bold text-lg">${item.amount} 💎</div>
-          ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
-          ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
-      `
+        ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
+        <div class="text-white font-bold text-lg">${item.amount} 💎</div>
+        ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
+        ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
+    `
 
     amountElement.addEventListener("click", (e) => selectDepositAmount(item, e))
     depositAmountsContainer.appendChild(amountElement)
@@ -648,9 +648,9 @@ function renderPossiblePrizes(caseData) {
 
     prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
     prizeElement.innerHTML = `
-          <div class="font-bold">${reward.cost} 💎</div>
-          <div class="text-xs opacity-75">${reward.probability}%</div>
-      `
+        <div class="font-bold">${reward.cost} 💎</div>
+        <div class="text-xs opacity-75">${reward.probability}%</div>
+    `
     possiblePrizes.appendChild(prizeElement)
   })
 }
@@ -659,6 +659,8 @@ async function spinPrizes() {
   if (isSpinning) return
 
   const demoMode = document.getElementById("demoMode").checked
+  const prizeScroll = document.getElementById("prizeScroll")
+  const openBtn = document.getElementById("openCaseBtn")
 
   if (!demoMode && userFantics < currentCase.cost) {
     showNotification("Недостаточно фантиков!", "error")
@@ -666,15 +668,11 @@ async function spinPrizes() {
   }
 
   isSpinning = true
-  const prizeScroll = document.getElementById("prizeScroll")
-  const openBtn = document.getElementById("openCaseBtn")
-
   openBtn.disabled = true
   openBtn.innerHTML = '<span class="animate-pulse">Открываем...</span>'
 
   try {
     let result = null
-
     if (!demoMode) {
       result = await openCaseAPI(currentCase.id)
     } else {
@@ -683,24 +681,51 @@ async function spinPrizes() {
       result = { gift: randomReward.cost }
     }
 
-    // Перегенерируем призы для новой анимации
-    renderPrizeScroll(currentCase)
+    const itemWidth = 20 * 4 + 16 // Ширина элемента (w-20 = 80px) + gap-4 (16px) = 96px
+    const numPrizes = 150 // Генерируем больше призов для длинной прокрутки
+    const winningPrizeIndex = 100 + Math.floor(Math.random() * 10) // Приземлимся между 100-м и 109-м призом
+    const extraSpins = 5 // Количество полных "экранов" прокрутки перед приземлением
 
-    // Запускаем анимацию прокрутки
-    prizeScroll.classList.add("prize-scroll")
-
-    // Ждем окончания анимации (3 секунды)
-    setTimeout(() => {
-      prizeScroll.classList.remove("prize-scroll")
-
-      // Находим центральный приз и устанавливаем выигрышное значение
-      const centerPrize = prizeScroll.children[Math.floor(prizeScroll.children.length / 2)]
-      if (centerPrize) {
-        centerPrize.textContent = `${result.gift} 💎`
-        centerPrize.classList.add("winning-prize")
+    prizeScroll.innerHTML = ""
+    for (let i = 0; i < numPrizes; i++) {
+      const prizeElement = document.createElement("div")
+      let rewardValue
+      if (i === winningPrizeIndex) {
+        rewardValue = result.gift // Вставляем фактический выигрышный приз
+      } else {
+        const randomReward =
+          currentCase.possible_rewards[Math.floor(Math.random() * currentCase.possible_rewards.length)]
+        rewardValue = randomReward.cost
       }
 
-      // Обновляем баланс если не демо режим
+      let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
+      if (rewardValue >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
+      else if (rewardValue >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
+      else if (rewardValue >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
+      else if (rewardValue >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
+
+      prizeElement.className = `flex-shrink-0 w-20 h-20 ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20`
+      prizeElement.textContent = `${rewardValue} 💎`
+      prizeScroll.appendChild(prizeElement)
+    }
+
+    prizeScroll.style.transition = "none"
+    prizeScroll.style.transform = "translateX(0px)"
+    prizeScroll.offsetHeight
+
+    const containerWidth = prizeScroll.offsetWidth
+    const targetOffset = winningPrizeIndex * itemWidth - containerWidth / 2 + itemWidth / 2
+    const totalScrollDistance = targetOffset + extraSpins * containerWidth
+
+    prizeScroll.style.transition = "transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)"
+    prizeScroll.style.transform = `translateX(-${totalScrollDistance}px)`
+
+    setTimeout(() => {
+      const winningElement = prizeScroll.children[winningPrizeIndex]
+      if (winningElement) {
+        winningElement.classList.add("winning-prize")
+      }
+
       if (!demoMode) {
         const delay = API_BASE.includes("localhost") ? 1000 : 3000
         setTimeout(() => {
@@ -709,28 +734,21 @@ async function spinPrizes() {
         }, delay)
       }
 
-      // Показываем результат через секунду после остановки
       setTimeout(() => {
-        const profit = result.profit || 0
-        const profitText = profit > 0 ? `(+${profit} 💎)` : profit < 0 ? `(${profit} 💎)` : ""
-
-        showNotification(`🎉 Поздравляем! Вы выиграли: ${result.gift} 💎 ${profitText}`, "success", 5000)
-
-        // Убираем эффект свечения
-        if (centerPrize) {
-          centerPrize.classList.remove("winning-prize")
+        if (winningElement) {
+          winningElement.classList.remove("winning-prize")
         }
+        prizeScroll.style.transition = "none"
+        prizeScroll.style.transform = "translateX(0px)"
+        renderPrizeScroll(currentCase)
 
-        // Возвращаем кнопку в нормальное состояние
         openBtn.disabled = false
         updateOpenButton()
         isSpinning = false
       }, 1000)
-    }, 3000) // Время анимации прокрутки
+    }, 5000)
   } catch (error) {
     showNotification(`❌ Ошибка: ${error.message}`, "error")
-
-    // В случае ошибки также возвращаем кнопку в нормальное состояние
     openBtn.disabled = false
     updateOpenButton()
     isSpinning = false
