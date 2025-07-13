@@ -195,8 +195,6 @@ async function fetchUserFantics() {
     console.log("   API Base:", API_BASE)
     console.log("   Авторизация доступна:", isAuthAvailable())
 
-    // showConnectionStatus("Получение баланса...") // Убрано по запросу пользователя
-
     const response = await fetch(url, {
       method: "GET",
       headers: getAuthHeaders(),
@@ -211,7 +209,6 @@ async function fetchUserFantics() {
       userFantics = data.fantics
       updateFanticsDisplay()
       console.log("✅ Баланс получен:", userFantics)
-      // showConnectionStatus("Баланс обновлен") // Убрано по запросу пользователя
     } else {
       const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
       console.error("❌ Ошибка получения баланса:", response.status, errorData)
@@ -242,7 +239,6 @@ async function fetchCases() {
   try {
     const url = `${API_BASE}/cases`
     console.log("📡 Запрос кейсов:", url)
-    // showConnectionStatus("Загрузка кейсов...") // Убрано по запросу пользователя
 
     const response = await fetch(url, {
       method: "GET",
@@ -268,7 +264,6 @@ async function fetchCases() {
       console.log("📡 Преобразованные кейсы:", cases)
       renderCases()
       console.log("✅ Кейсы загружены:", cases.length)
-      // showConnectionStatus(`Загружено ${cases.length} кейсов`) // Убрано по запросу пользователя
     } else {
       const errorData = await response.json().catch(() => ({ detail: "Ошибка загрузки кейсов" }))
       console.error("❌ Ошибка получения кейсов:", response.status, errorData)
@@ -616,7 +611,6 @@ function openCasePage(caseData) {
   document.getElementById("caseTitle").textContent = caseData.name
   updateOpenButton()
 
-  // renderPrizeScroll(caseData) // Теперь вызывается внутри spinPrizes
   renderPossiblePrizes(caseData)
 }
 
@@ -630,14 +624,23 @@ function renderPrizeScroll(caseData, winningGiftCost) {
   const itemWidth = 20 * 4 + 16 // Ширина элемента (w-20 = 80px) + gap-4 (16px) = 96px
   const numPrizes = 150 // Генерируем больше призов для длинной прокрутки
   // Выигрышный приз будет где-то в середине, чтобы обеспечить достаточное количество "оборотов"
-  const winningPrizeIndex = 100 + Math.floor(Math.random() * 10) // Приземлимся между 100-м и 109-м призом
+  // Мы хотим, чтобы выигрышный приз был в позиции, на которую мы точно нацелимся.
+  // Например, 75-й элемент (индекс 74)
+  const targetWinningIndex = 74 // Индекс элемента, который будет выигрышным
+
+  console.log("DEBUG: renderPrizeScroll - Ожидаемый выигрышный приз (winningGiftCost):", winningGiftCost)
+  console.log(
+    "DEBUG: renderPrizeScroll - Целевой индекс выигрышного приза на ленте (targetWinningIndex):",
+    targetWinningIndex,
+  )
 
   for (let i = 0; i < numPrizes; i++) {
     const prizeElement = document.createElement("div")
     let rewardValue
 
-    if (i === winningPrizeIndex) {
-      rewardValue = winningGiftCost // Вставляем фактический выигрышный приз
+    if (i === targetWinningIndex) {
+      // Вставляем фактический выигрышный приз в целевую позицию
+      rewardValue = winningGiftCost
     } else {
       const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
       rewardValue = randomReward.cost
@@ -708,42 +711,56 @@ async function spinPrizes() {
       // Вызываем API для открытия кейса (сервер сам обработает списание и добавление)
       result = await openCaseAPI(currentCase.id)
       console.log("DEBUG: Результат от openCaseAPI:", result)
-      // Важно: здесь мы НЕ применяем result.profit, так как стоимость уже списана.
-      // Мы добавим только gift.cost после анимации.
+      console.log("DEBUG: Фактический выигрыш от сервера (result.gift):", result.gift)
     } else {
       const possibleRewards = currentCase.possible_rewards
       const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
-      result = { gift: randomReward.cost, profit: randomReward.cost - currentCase.cost } // Сохраняем profit для отладки/консистентности
+      result = { gift: randomReward.cost, profit: randomReward.cost - currentCase.cost }
       // Для демо-режима также симулируем немедленное списание для визуальной консистентности
       userFantics -= currentCase.cost
       updateFanticsDisplay()
       console.log("DEBUG: Баланс после списания стоимости кейса (Демо):", userFantics)
+      console.log("DEBUG: Симулированный выигрыш (Демо):", result.gift)
     }
 
     // Теперь, когда мы знаем выигрышный приз, генерируем ленту
+    // Важно: передаем result.gift, чтобы он был вставлен в целевую позицию
     renderPrizeScroll(currentCase, result.gift)
 
     const itemWidth = 20 * 4 + 16 // Ширина элемента (w-20 = 80px) + gap-4 (16px) = 96px
     const numPrizes = 150
-    const winningPrizeIndex = 100 + Math.floor(Math.random() * 10)
-    const extraSpins = 5
+    const targetWinningIndex = 74 // Индекс элемента, который будет выигрышным (должен совпадать с renderPrizeScroll)
+    const extraSpins = 5 // Количество полных оборотов перед остановкой
 
     prizeScroll.style.transition = "none"
     prizeScroll.style.transform = "translateX(0px)"
     prizeScroll.offsetHeight // Принудительная перерисовка
 
     const containerWidth = prizeScroll.offsetWidth
-    const targetOffset = winningPrizeIndex * itemWidth - containerWidth / 2 + itemWidth / 2
-    const totalScrollDistance = targetOffset + extraSpins * containerWidth
+    // Рассчитываем смещение до целевого элемента
+    const offsetToTargetElement = targetWinningIndex * itemWidth
+    // Центрируем целевой элемент
+    const centerOffset = containerWidth / 2 - itemWidth / 2
+    // Общее расстояние для прокрутки: несколько полных оборотов + смещение до целевого элемента + центрирование
+    const totalScrollDistance = extraSpins * numPrizes * itemWidth + offsetToTargetElement - centerOffset
+
+    console.log("DEBUG: itemWidth:", itemWidth)
+    console.log("DEBUG: containerWidth:", containerWidth)
+    console.log("DEBUG: offsetToTargetElement:", offsetToTargetElement)
+    console.log("DEBUG: centerOffset:", centerOffset)
+    console.log("DEBUG: totalScrollDistance:", totalScrollDistance)
 
     prizeScroll.style.transition = "transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)"
     prizeScroll.style.transform = `translateX(-${totalScrollDistance}px)`
 
     setTimeout(() => {
       // Этот setTimeout для завершения анимации (5 секунд)
-      const winningElement = prizeScroll.children[winningPrizeIndex]
+      // Находим элемент, который должен быть выигрышным, по его индексу
+      const winningElement = prizeScroll.children[targetWinningIndex]
       if (winningElement) {
         winningElement.classList.add("winning-prize")
+        console.log("DEBUG: Визуально выделенный приз (из DOM):", winningElement.textContent)
+        console.log("DEBUG: Ожидаемый выигрышный приз (из API):", result.gift)
       }
 
       // 2. Добавляем сумму выигрыша к балансу после анимации
@@ -771,7 +788,9 @@ async function spinPrizes() {
         }
         prizeScroll.style.transition = "none"
         prizeScroll.style.transform = "translateX(0px)"
-        renderPrizeScroll(currentCase, result.gift) // Перегенерируем для следующего спина
+        // Перегенерируем для следующего спина, чтобы лента была "свежей"
+        // и не было проблем с повторным использованием элементов
+        renderPrizeScroll(currentCase, result.gift)
 
         openBtn.disabled = false
         openBtn.classList.remove("animate-pulse")
@@ -848,7 +867,6 @@ async function initApp() {
     await testConnection()
   }
 
-  // showConnectionStatus("Подключение к серверу...") // УДАЛЕНО по запросу пользователя
   await fetchUserFantics()
   await fetchCases()
 
