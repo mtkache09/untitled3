@@ -163,6 +163,11 @@ function showConnectionStatus(message, isError = false) {
   const statusDiv = document.getElementById("connectionStatus")
   const statusText = document.getElementById("statusText")
 
+  if (!statusDiv || !statusText) {
+    console.error("DEBUG: Элементы статуса подключения не найдены!")
+    return
+  }
+
   statusText.textContent = message
   statusDiv.className = `mb-4 p-3 rounded-lg text-center text-sm font-medium ${
     isError
@@ -179,6 +184,7 @@ function showConnectionStatus(message, isError = false) {
 }
 
 async function fetchUserFantics() {
+  console.log("DEBUG: Начало fetchUserFantics") // ДОБАВЛЕНО
   try {
     const userId = getUserId()
     const url = `${API_BASE}/fantics/${userId}`
@@ -188,8 +194,6 @@ async function fetchUserFantics() {
     console.log("   User ID:", userId)
     console.log("   API Base:", API_BASE)
     console.log("   Авторизация доступна:", isAuthAvailable())
-
-    showConnectionStatus("Получение баланса...")
 
     const response = await fetch(url, {
       method: "GET",
@@ -228,9 +232,11 @@ async function fetchUserFantics() {
     userFantics = 0
     updateFanticsDisplay()
   }
+  console.log("DEBUG: Конец fetchUserFantics") // ДОБАВЛЕНО
 }
 
 async function fetchCases() {
+  console.log("DEBUG: Начало fetchCases") // ДОБАВЛЕНО
   try {
     const url = `${API_BASE}/cases`
     console.log("📡 Запрос кейсов:", url)
@@ -277,6 +283,7 @@ async function fetchCases() {
     cases = []
     renderCases()
   }
+  console.log("DEBUG: Конец fetchCases") // ДОБАВЛЕНО
 }
 
 // Функция для тестирования соединения и авторизации
@@ -470,16 +477,16 @@ function renderCases() {
     }
 
     caseElement.innerHTML = `
-        <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
-            <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
-        </div>
-        <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
-        <div class="flex items-center justify-center gap-1">
-            <span class="text-purple-400">💎</span>
-            <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
-        </div>
-        ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
-    `
+      <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
+          <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
+      </div>
+      <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
+      <div class="flex items-center justify-center gap-1">
+          <span class="text-purple-400">💎</span>
+          <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
+      </div>
+      ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
+  `
 
     if (canAfford) {
       caseElement.addEventListener("click", () => openCasePage(caseItem))
@@ -502,11 +509,11 @@ function renderDepositAmounts() {
     const totalAmount = item.amount + item.bonus
 
     amountElement.innerHTML = `
-        ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
-        <div class="text-white font-bold text-lg">${item.amount} 💎</div>
-        ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
-        ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
-    `
+      ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
+      <div class="text-white font-bold text-lg">${item.amount} 💎</div>
+      ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
+      ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
+  `
 
     amountElement.addEventListener("click", (e) => selectDepositAmount(item, e))
     depositAmountsContainer.appendChild(amountElement)
@@ -661,9 +668,9 @@ function renderPossiblePrizes(caseData) {
 
     prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
     prizeElement.innerHTML = `
-        <div class="font-bold">${reward.cost} 💎</div>
-        <div class="text-xs opacity-75">${reward.probability}%</div>
-    `
+      <div class="font-bold">${reward.cost} 💎</div>
+      <div class="text-xs opacity-75">${reward.probability}%</div>
+  `
     possiblePrizes.appendChild(prizeElement)
   })
 }
@@ -789,6 +796,7 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
 })
 
 async function initApp() {
+  console.log("DEBUG: Начало initApp") // ДОБАВЛЕНО
   console.log("🚀 Инициализация приложения...")
   console.log("API URL:", API_BASE)
   console.log("Авторизация доступна:", isAuthAvailable() ? "✅ Да" : "❌ Нет")
@@ -815,6 +823,7 @@ async function initApp() {
   await fetchCases()
 
   console.log("✅ Приложение готово!")
+  console.log("DEBUG: Конец initApp") // ДОБАВЛЕНО
 }
 
 initApp()
