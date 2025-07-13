@@ -205,7 +205,7 @@ async function fetchUserFantics() {
       userFantics = data.fantics
       updateFanticsDisplay()
       console.log("✅ Баланс получен:", userFantics)
-      showConnectionStatus("Баланс обновлен")
+      // showConnectionStatus("Баланс обновлен") // Убрано по запросу пользователя
     } else {
       const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
       console.error("❌ Ошибка получения баланса:", response.status, errorData)
@@ -348,7 +348,7 @@ async function openCaseAPI(caseId) {
       mode: "cors",
     })
 
-    console.log("📡 Ответ сервера (открытие кейса):", response.status)
+    console.log("📡 Ответ сервера:", response.status, response.statusText)
 
     if (response.ok) {
       const result = await response.json()
@@ -356,7 +356,7 @@ async function openCaseAPI(caseId) {
       showConnectionStatus("Кейс открыт!")
       return result
     } else {
-      const errorData = await response.json().catch(() => ({ detail: "Ошибка открытия кейса" }))
+      const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
       console.error("❌ Ошибка открытия кейса:", response.status, errorData)
       handleApiError(response, errorData)
       throw new Error(errorData.detail || "Ошибка открытия кейса")
@@ -689,14 +689,16 @@ async function spinPrizes() {
   try {
     let result = null
     if (!demoMode) {
-      // Списываем стоимость кейса с UI сразу
-      userFantics -= currentCase.cost
-      updateFanticsDisplay()
+      // Вызываем API для открытия кейса и получаем результат (включая profit)
       result = await openCaseAPI(currentCase.id)
+      // Оптимистично обновляем баланс на UI с учетом чистого выигрыша/проигрыша
+      userFantics += result.profit // result.profit = gift - spent
+      updateFanticsDisplay()
     } else {
       const possibleRewards = currentCase.possible_rewards
       const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
-      result = { gift: randomReward.cost }
+      // Симулируем profit для демо-режима
+      result = { gift: randomReward.cost, profit: randomReward.cost - currentCase.cost }
     }
 
     // Теперь, когда мы знаем выигрышный приз, генерируем ленту
@@ -709,7 +711,7 @@ async function spinPrizes() {
 
     prizeScroll.style.transition = "none"
     prizeScroll.style.transform = "translateX(0px)"
-    prizeScroll.offsetHeight
+    prizeScroll.offsetHeight // Принудительная перерисовка
 
     const containerWidth = prizeScroll.offsetWidth
     const targetOffset = winningPrizeIndex * itemWidth - containerWidth / 2 + itemWidth / 2
@@ -724,11 +726,11 @@ async function spinPrizes() {
         winningElement.classList.add("winning-prize")
       }
 
-      // Обновляем баланс с сервера после завершения анимации
-      // Это учтет как списание, так и добавление фантиков
+      // Запрашиваем актуальный баланс с сервера после небольшой задержки
+      // Это обеспечит конечную согласованность, особенно при использовании RabbitMQ
       const delay = API_BASE.includes("localhost") ? 1000 : 3000
       setTimeout(() => {
-        fetchUserFantics()
+        fetchUserFantics() // Это обновит баланс с сервера
       }, delay)
 
       setTimeout(() => {
@@ -747,6 +749,8 @@ async function spinPrizes() {
     }, 5000) // Соответствует длительности анимации
   } catch (error) {
     showNotification(`❌ Ошибка: ${error.message}`, "error")
+    // В случае ошибки, получаем актуальный баланс с сервера, чтобы избежать расхождений
+    fetchUserFantics()
     openBtn.disabled = false
     openBtn.classList.remove("animate-pulse")
     updateOpenButton()
