@@ -615,18 +615,18 @@ function openCasePage(caseData) {
 }
 
 // renderPrizeScroll теперь принимает выигрышный приз для корректного размещения
+// и возвращает индекс, куда был помещен выигрышный приз
 function renderPrizeScroll(caseData, winningGiftCost) {
   const prizeScroll = document.getElementById("prizeScroll")
   prizeScroll.innerHTML = ""
 
   const possibleRewards = caseData.possible_rewards
 
-  const itemWidth = 20 * 4 + 16 // Ширина элемента (w-20 = 80px) + gap-4 (16px) = 96px
   const numPrizes = 150 // Генерируем больше призов для длинной прокрутки
-  // Выигрышный приз будет где-то в середине, чтобы обеспечить достаточное количество "оборотов"
-  // Мы хотим, чтобы выигрышный приз был в позиции, на которую мы точно нацелимся.
-  // Например, 75-й элемент (индекс 74)
-  const targetWinningIndex = 74 // Индекс элемента, который будет выигрышным
+  // Целевой индекс, куда будет помещен выигрышный приз.
+  // Выбираем его достаточно далеко от начала, чтобы было место для "разгона"
+  // и достаточно далеко от конца, чтобы было место для "торможения".
+  const targetWinningIndex = 75 + Math.floor(Math.random() * 10) // Например, между 75 и 84
 
   console.log("DEBUG: renderPrizeScroll - Ожидаемый выигрышный приз (winningGiftCost):", winningGiftCost)
   console.log(
@@ -656,6 +656,7 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     prizeElement.textContent = `${rewardValue} 💎`
     prizeScroll.appendChild(prizeElement)
   }
+  return targetWinningIndex // Возвращаем индекс, чтобы spinPrizes знал, куда целиться
 }
 
 function renderPossiblePrizes(caseData) {
@@ -725,30 +726,41 @@ async function spinPrizes() {
 
     // Теперь, когда мы знаем выигрышный приз, генерируем ленту
     // Важно: передаем result.gift, чтобы он был вставлен в целевую позицию
-    renderPrizeScroll(currentCase, result.gift)
+    const targetWinningIndex = renderPrizeScroll(currentCase, result.gift) // Получаем индекс, куда был помещен выигрыш
 
-    const itemWidth = 20 * 4 + 16 // Ширина элемента (w-20 = 80px) + gap-4 (16px) = 96px
-    const numPrizes = 150
-    const targetWinningIndex = 74 // Индекс элемента, который будет выигрышным (должен совпадать с renderPrizeScroll)
-    const extraSpins = 5 // Количество полных оборотов перед остановкой
+    // Получаем ссылку на выигрышный элемент после его рендеринга
+    const winningElement = prizeScroll.children[targetWinningIndex]
+    if (!winningElement) {
+      console.error("ERROR: Winning element not found at target index:", targetWinningIndex)
+      throw new Error("Winning element not found.")
+    }
+
+    // Получаем ширину видимого контейнера (родителя с overflow-hidden)
+    const viewport = prizeScroll.parentElement
+    const viewportWidth = viewport.offsetWidth
+
+    // Рассчитываем точную позицию центра выигрышного элемента относительно начала prizeScroll
+    const winningElementCenterPosition = winningElement.offsetLeft + winningElement.offsetWidth / 2
+
+    // Рассчитываем желаемую позицию прокрутки: центр выигрышного элемента должен совпасть с центром viewport
+    const desiredScrollPosition = winningElementCenterPosition - viewportWidth / 2
+
+    // Добавляем дополнительные полные "обороты" для визуального эффекта
+    // Это гарантирует, что барабан прокрутится достаточно много раз
+    const extraFullSpins = 5 // Прокрутить 5 полных "экранов"
+    const totalScrollDistance = desiredScrollPosition + extraFullSpins * viewportWidth
+
+    console.log("DEBUG: winningElement.offsetLeft:", winningElement.offsetLeft)
+    console.log("DEBUG: winningElement.offsetWidth:", winningElement.offsetWidth)
+    console.log("DEBUG: winningElementCenterPosition:", winningElementCenterPosition)
+    console.log("DEBUG: viewportWidth:", viewportWidth)
+    console.log("DEBUG: desiredScrollPosition:", desiredScrollPosition)
+    console.log("DEBUG: extraFullSpins * viewportWidth:", extraFullSpins * viewportWidth)
+    console.log("DEBUG: totalScrollDistance (calculated):", totalScrollDistance)
 
     prizeScroll.style.transition = "none"
     prizeScroll.style.transform = "translateX(0px)"
     prizeScroll.offsetHeight // Принудительная перерисовка
-
-    const containerWidth = prizeScroll.offsetWidth
-    // Рассчитываем смещение до целевого элемента
-    const offsetToTargetElement = targetWinningIndex * itemWidth
-    // Центрируем целевой элемент
-    const centerOffset = containerWidth / 2 - itemWidth / 2
-    // Общее расстояние для прокрутки: несколько полных оборотов + смещение до целевого элемента + центрирование
-    const totalScrollDistance = extraSpins * numPrizes * itemWidth + offsetToTargetElement - centerOffset
-
-    console.log("DEBUG: itemWidth:", itemWidth)
-    console.log("DEBUG: containerWidth:", containerWidth)
-    console.log("DEBUG: offsetToTargetElement:", offsetToTargetElement)
-    console.log("DEBUG: centerOffset:", centerOffset)
-    console.log("DEBUG: totalScrollDistance:", totalScrollDistance)
 
     prizeScroll.style.transition = "transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)"
     prizeScroll.style.transform = `translateX(-${totalScrollDistance}px)`
@@ -756,7 +768,7 @@ async function spinPrizes() {
     setTimeout(() => {
       // Этот setTimeout для завершения анимации (5 секунд)
       // Находим элемент, который должен быть выигрышным, по его индексу
-      const winningElement = prizeScroll.children[targetWinningIndex]
+      // (winningElement уже определен выше)
       if (winningElement) {
         winningElement.classList.add("winning-prize")
         console.log("DEBUG: Визуально выделенный приз (из DOM):", winningElement.textContent)
@@ -790,7 +802,8 @@ async function spinPrizes() {
         prizeScroll.style.transform = "translateX(0px)"
         // Перегенерируем для следующего спина, чтобы лента была "свежей"
         // и не было проблем с повторным использованием элементов
-        renderPrizeScroll(currentCase, result.gift)
+        // Здесь не нужно передавать result.gift, так как это просто подготовка к следующему спину
+        renderPrizeScroll(currentCase, 0) // Передаем 0 или любое другое значение, так как это не выигрышный спин
 
         openBtn.disabled = false
         openBtn.classList.remove("animate-pulse")
