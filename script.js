@@ -787,6 +787,8 @@ async function spinPrizes() {
       const currentTransform = window.getComputedStyle(prizeScroll).transform
       let currentScrollX = 0
 
+      console.log("DEBUG: Raw transform style for snap correction:", currentTransform) // Добавлено для отладки
+
       // Пробуем распарсить matrix()
       const matrixMatch = currentTransform.match(
         /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/,
@@ -802,7 +804,9 @@ async function spinPrizes() {
           currentScrollX = Math.abs(Number.parseFloat(translateXMatch[1]))
           console.log("DEBUG: Parsed from translateX:", currentScrollX)
         } else {
-          console.warn("WARNING: Could not parse transform style:", currentTransform)
+          console.warn("WARNING: Could not parse transform style, unexpected format:", currentTransform)
+          // Fallback to 0 if parsing fails to prevent TypeError
+          currentScrollX = 0
         }
       }
 
