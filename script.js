@@ -344,9 +344,7 @@ async function openCaseAPI(caseId) {
     const response = await fetch(url, {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify({
-        user_id: userId,
-      }),
+      // Убираем body - user_id должен браться из авторизации
       mode: "cors",
     })
 
@@ -386,8 +384,8 @@ async function addFantics(amount) {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
-        user_id: userId,
         amount: amount,
+        // Убираем user_id - он должен браться из авторизации
       }),
       mode: "cors",
     })
