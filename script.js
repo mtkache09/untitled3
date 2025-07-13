@@ -34,12 +34,22 @@ function getAuthHeaders() {
 
   // Проверяем доступность Telegram WebApp
   if (window.Telegram?.WebApp?.initData) {
+    // Используем правильный формат заголовка согласно вашему бэкенду
     headers["Authorization"] = `tgWebAppData ${window.Telegram.WebApp.initData}`
     console.log("✅ Используем Telegram WebApp авторизацию")
+    console.log("📱 Init Data длина:", window.Telegram.WebApp.initData.length)
   } else {
     console.warn("⚠️ Telegram WebApp недоступен, используем тестовый режим")
     // В тестовом режиме можно добавить альтернативную авторизацию
-    // headers['X-Test-Auth'] = 'test-mode'
+    // Для разработки можно передать initData через query параметр
+    if (window.location.search.includes("initData=")) {
+      const urlParams = new URLSearchParams(window.location.search)
+      const initData = urlParams.get("initData")
+      if (initData) {
+        headers["Authorization"] = `tgWebAppData ${initData}`
+        console.log("✅ Используем initData из URL параметров")
+      }
+    }
   }
 
   return headers
@@ -47,7 +57,7 @@ function getAuthHeaders() {
 
 // Функция для проверки доступности Telegram WebApp
 function isTelegramWebApp() {
-  return !!window.Telegram?.WebApp?.initData
+  return !!window.Telegram?.WebApp?.initData || window.location.search.includes("initData=")
 }
 
 // Улучшенная функция получения User ID
@@ -57,6 +67,17 @@ const getUserId = () => {
     console.log("✅ Telegram User ID:", userId)
     return userId
   }
+
+  // Попробуем получить из URL параметров для тестирования
+  if (window.location.search.includes("user_id=")) {
+    const urlParams = new URLSearchParams(window.location.search)
+    const userId = Number.parseInt(urlParams.get("user_id"))
+    if (userId) {
+      console.log("✅ User ID из URL:", userId)
+      return userId
+    }
+  }
+
   console.warn("⚠️ Telegram User ID не найден, используем тестовый: 123456")
   return 123456
 }
@@ -65,23 +86,30 @@ const getUserId = () => {
 function handleApiError(response, error) {
   switch (response?.status) {
     case 401:
-      showNotification("❌ Ошибка авторизации. Перезапустите приложение", "error", 5000)
+      showNotification("❌ Ошибка авторизации. Перезапустите приложение в Telegram", "error", 8000)
       console.error("401 Unauthorized:", error)
+      // Можно добавить логику для перезапуска приложения
       break
     case 403:
-      showNotification("❌ Доступ запрещен", "error")
+      showNotification("❌ Доступ запрещен. Вы можете управлять только своим аккаунтом", "error", 5000)
       console.error("403 Forbidden:", error)
       break
     case 404:
       showNotification("❌ Ресурс не найден", "error")
       console.error("404 Not Found:", error)
       break
+    case 400:
+      // Обрабатываем специфичные ошибки бизнес-логики
+      const message = error?.detail || "Неверный запрос"
+      showNotification(`❌ ${message}`, "error", 5000)
+      console.error("400 Bad Request:", error)
+      break
     case 500:
-      showNotification("❌ Ошибка сервера", "error")
+      showNotification("❌ Ошибка сервера. Попробуйте позже", "error")
       console.error("500 Server Error:", error)
       break
     default:
-      showNotification(`❌ Ошибка: ${error?.message || "Неизвестная ошибка"}`, "error")
+      showNotification(`❌ Ошибка: ${error?.detail || error?.message || "Неизвестная ошибка"}`, "error")
       console.error("API Error:", error)
   }
 }
@@ -186,7 +214,7 @@ async function fetchUserFantics() {
 
     if (!isTelegramWebApp()) {
       showConnectionStatus("Доступно только в Telegram WebApp", true)
-      showNotification("⚠️ Приложение работает только в Telegram", "error", 5000)
+      showNotification("⚠️ Приложение работает только в Telegram", "error", 8000)
     } else {
       showConnectionStatus("Сервер недоступен", true)
     }
@@ -269,16 +297,28 @@ async function testConnection() {
     const response2 = await fetch(`${API_BASE}/fantics/${userId}`, {
       headers: getAuthHeaders(),
     })
-    const data2 = await response2.json()
-    console.log("✅ Fantics endpoint:", data2)
+
+    if (response2.ok) {
+      const data2 = await response2.json()
+      console.log("✅ Fantics endpoint:", data2)
+    } else {
+      const error2 = await response2.json()
+      console.log("❌ Fantics endpoint error:", error2)
+    }
 
     // Тест 3: Проверка кейсов
     console.log("📡 Тест 3: Проверка /cases")
     const response3 = await fetch(`${API_BASE}/cases`, {
       headers: getAuthHeaders(),
     })
-    const data3 = await response3.json()
-    console.log("✅ Cases endpoint:", data3)
+
+    if (response3.ok) {
+      const data3 = await response3.json()
+      console.log("✅ Cases endpoint:", data3)
+    } else {
+      const error3 = await response3.json()
+      console.log("❌ Cases endpoint error:", error3)
+    }
   } catch (error) {
     console.error("❌ Ошибка тестирования:", error)
   }
@@ -351,6 +391,8 @@ async function addFantics(amount) {
       const result = await response.json()
       console.log("✅ Пополнение успешно:", result)
       showConnectionStatus("Баланс пополняется...")
+
+      // Определяем задержку в зависимости от режима (RabbitMQ или прямые транзакции)
       const delay = API_BASE.includes("localhost") ? 1000 : 3000
       setTimeout(() => {
         fetchUserFantics()
@@ -732,6 +774,11 @@ async function initApp() {
   // Показываем предупреждение если не в Telegram
   if (!isTelegramWebApp()) {
     showNotification("⚠️ Для полной функциональности откройте в Telegram", "info", 8000)
+  }
+
+  // Запускаем тест соединения для отладки
+  if (window.location.search.includes("debug=true")) {
+    await testConnection()
   }
 
   showConnectionStatus("Подключение к серверу...")
