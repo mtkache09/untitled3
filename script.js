@@ -661,6 +661,7 @@ async function spinPrizes() {
   const demoMode = document.getElementById("demoMode").checked
   const prizeScroll = document.getElementById("prizeScroll")
   const openBtn = document.getElementById("openCaseBtn")
+  const openBtnText = document.getElementById("openBtnText") // Получаем span элемент
 
   if (!demoMode && userFantics < currentCase.cost) {
     showNotification("Недостаточно фантиков!", "error")
@@ -669,7 +670,8 @@ async function spinPrizes() {
 
   isSpinning = true
   openBtn.disabled = true
-  openBtn.innerHTML = '<span class="animate-pulse">Открываем...</span>'
+  openBtnText.textContent = "Открываем..." // Меняем textContent span'а
+  openBtn.classList.add("animate-pulse") // Добавляем класс пульсации к кнопке
 
   try {
     let result = null
@@ -743,14 +745,16 @@ async function spinPrizes() {
         renderPrizeScroll(currentCase)
 
         openBtn.disabled = false
-        updateOpenButton()
+        openBtn.classList.remove("animate-pulse") // Удаляем класс пульсации
+        updateOpenButton() // Обновляем текст кнопки
         isSpinning = false
       }, 1000)
     }, 5000)
   } catch (error) {
     showNotification(`❌ Ошибка: ${error.message}`, "error")
     openBtn.disabled = false
-    updateOpenButton()
+    openBtn.classList.remove("animate-pulse") // Удаляем класс пульсации при ошибке
+    updateOpenButton() // Обновляем текст кнопки при ошибке
     isSpinning = false
   }
 }
