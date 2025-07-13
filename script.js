@@ -638,6 +638,8 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     targetWinningIndex,
   )
 
+  const lastTwoRewards = [null, null] // Для отслеживания последних двух призов
+
   for (let i = 0; i < numPrizes; i++) {
     const prizeElement = document.createElement("div")
     let rewardValue
@@ -645,11 +647,25 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     if (i === targetWinningIndex) {
       // Вставляем фактический выигрышный приз в целевую позицию
       rewardValue = winningGiftCost
-      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`) // Добавлено
+      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`)
     } else {
-      const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
-      rewardValue = randomReward.cost
+      let randomReward
+      let attempts = 0
+      do {
+        randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
+        rewardValue = randomReward.cost
+        attempts++
+        // Защита от бесконечного цикла, если нет других призов
+        if (attempts > 50 && possibleRewards.length > 1) {
+          console.warn("WARNING: Не удалось найти уникальный приз после 50 попыток. Возможно, мало вариантов призов.")
+          break
+        }
+      } while (lastTwoRewards[0] === rewardValue && lastTwoRewards[1] === rewardValue)
     }
+
+    // Обновляем историю последних двух призов
+    lastTwoRewards[0] = lastTwoRewards[1]
+    lastTwoRewards[1] = rewardValue
 
     let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
     if (rewardValue >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
@@ -778,7 +794,7 @@ async function spinPrizes() {
         { transform: `translateX(-${totalScrollDistance}px)` }, // Конечное состояние
       ],
       {
-        duration: 5000, // 5 секунд
+        duration: 8000, // Увеличена длительность до 8 секунд
         easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Та же кривая ускорения
         fill: "forwards", // Сохранить конечное состояние после завершения
       },
