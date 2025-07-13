@@ -136,7 +136,7 @@ async function fetchCases() {
     if (response.ok) {
       const rawCases = await response.json()
       console.log("📡 Сырые данные кейсов:", rawCases)
-
+      
       // Преобразуем новый формат в старый для совместимости
       cases = rawCases.map(caseData => ({
         ...caseData,
@@ -145,7 +145,7 @@ async function fetchCases() {
           probability: present.probability
         }))
       }))
-
+      
       console.log("📡 Преобразованные кейсы:", cases)
       renderCases()
       console.log("✅ Кейсы загружены:", cases.length)
@@ -199,7 +199,7 @@ async function testConnection() {
 async function openCaseAPI(caseId) {
   try {
     const userId = getUserId()
-    const url = `${API_BASE}/open_case/${caseId}?user_id=${userId}`
+    const url = `${API_BASE}/open_case/${caseId}`
 
     console.log("📡 Открытие кейса:", url)
     showConnectionStatus("Открытие кейса...")
@@ -209,6 +209,9 @@ async function openCaseAPI(caseId) {
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        user_id: userId
+      }),
       mode: 'cors'
     })
 
@@ -616,4 +619,3 @@ async function initApp() {
 }
 
 initApp()
-
