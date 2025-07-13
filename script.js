@@ -209,11 +209,13 @@ async function fetchUserFantics() {
       userFantics = data.fantics
       updateFanticsDisplay()
       console.log("✅ Баланс получен:", userFantics)
+      return userFantics // Возвращаем баланс
     } else {
       const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
       console.error("❌ Ошибка получения баланса:", response.status, errorData)
       handleApiError(response, errorData)
       showConnectionStatus("Ошибка получения баланса", true)
+      return null // Возвращаем null в случае ошибки
     }
   } catch (error) {
     console.error("❌ Ошибка API:", error)
@@ -230,6 +232,7 @@ async function fetchUserFantics() {
     // В случае ошибки показываем нулевой баланс
     userFantics = 0
     updateFanticsDisplay()
+    return null // Возвращаем null в случае ошибки
   }
   console.log("DEBUG: Конец fetchUserFantics")
 }
@@ -739,6 +742,13 @@ async function spinPrizes() {
     const viewport = prizeScroll.parentElement
     const viewportWidth = viewport.offsetWidth
 
+    // Динамически измеряем ширину элемента и отступ
+    const firstItem = prizeScroll.children[0]
+    const itemWidth = firstItem.offsetWidth // Ширина элемента, включая padding/border
+    const computedStyle = window.getComputedStyle(firstItem)
+    const marginRight = Number.parseFloat(computedStyle.marginRight) // Фактический отступ справа
+    const effectiveItemWidth = itemWidth + marginRight // Общая эффективная ширина элемента с отступом
+
     // Рассчитываем точную позицию центра выигрышного элемента относительно начала prizeScroll
     const winningElementCenterPosition = winningElement.offsetLeft + winningElement.offsetWidth / 2
 
@@ -746,10 +756,13 @@ async function spinPrizes() {
     const desiredScrollPosition = winningElementCenterPosition - viewportWidth / 2
 
     // Добавляем дополнительные полные "обороты" для визуального эффекта
-    // Это гарантирует, что барабан прокрутится достаточно много раз
+    // Используем viewportWidth для расчета полных "экранов"
     const extraFullSpins = 5 // Прокрутить 5 полных "экранов"
     const totalScrollDistance = desiredScrollPosition + extraFullSpins * viewportWidth
 
+    console.log("DEBUG: Measured itemWidth:", itemWidth)
+    console.log("DEBUG: Measured marginRight:", marginRight)
+    console.log("DEBUG: Effective item width:", effectiveItemWidth)
     console.log("DEBUG: winningElement.offsetLeft:", winningElement.offsetLeft)
     console.log("DEBUG: winningElement.offsetWidth:", winningElement.offsetWidth)
     console.log("DEBUG: winningElementCenterPosition:", winningElementCenterPosition)
@@ -765,15 +778,46 @@ async function spinPrizes() {
     prizeScroll.style.transition = "transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)"
     prizeScroll.style.transform = `translateX(-${totalScrollDistance}px)`
 
-    setTimeout(() => {
+    setTimeout(async () => {
+      // Добавляем async сюда
       // Этот setTimeout для завершения анимации (5 секунд)
-      // Находим элемент, который должен быть выигрышным, по его индексу
-      // (winningElement уже определен выше)
       if (winningElement) {
         winningElement.classList.add("winning-prize")
         console.log("DEBUG: Визуально выделенный приз (из DOM):", winningElement.textContent)
         console.log("DEBUG: Ожидаемый выигрышный приз (из API):", result.gift)
       }
+
+      // === НАЧАЛО ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ (SNAP CORRECTION) ===
+      // Получаем текущее положение прокрутки после основной анимации
+      const currentTransform = window.getComputedStyle(prizeScroll).transform
+      const currentScrollX = Math.abs(Number.parseFloat(currentTransform.match(/translateX$$(-?\d+)px$$/)[1])) // Текущее значение translateX
+
+      // Позиция левого края выигрышного элемента относительно начала prizeScroll
+      const actualWinningElementOffsetLeft = winningElement.offsetLeft
+
+      // Желаемая позиция левого края выигрышного элемента относительно левого края viewport
+      // (чтобы он был по центру)
+      const targetLeftInViewport = (viewportWidth - winningElement.offsetWidth) / 2
+
+      // Разница между тем, где элемент находится сейчас (относительно viewport),
+      // и где он должен быть.
+      // currentScrollX - это то, насколько prizeScroll смещен влево.
+      // actualWinningElementOffsetLeft - это позиция элемента внутри prizeScroll.
+      // (actualWinningElementOffsetLeft - currentScrollX) - это позиция элемента относительно viewport.
+      const finalAdjustment = actualWinningElementOffsetLeft - currentScrollX - targetLeftInViewport
+
+      console.log("DEBUG: Current scroll X (from transform):", currentScrollX)
+      console.log("DEBUG: Actual winning element offsetLeft:", actualWinningElementOffsetLeft)
+      console.log("DEBUG: Target left in viewport:", targetLeftInViewport)
+      console.log("DEBUG: Final adjustment needed:", finalAdjustment)
+
+      // Применяем коррекцию, если она значительна (например, больше 0.5 пикселя)
+      if (Math.abs(finalAdjustment) > 0.5) {
+        prizeScroll.style.transition = "transform 0.1s ease-out" // Очень быстрая коррекция
+        prizeScroll.style.transform = `translateX(-${totalScrollDistance + finalAdjustment}px)`
+        console.log("DEBUG: Applied snap adjustment.")
+      }
+      // === КОНЕЦ ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ ===
 
       // 2. Добавляем сумму выигрыша к балансу после анимации
       if (!demoMode) {
@@ -786,13 +830,43 @@ async function spinPrizes() {
         console.log("DEBUG: Баланс после добавления выигрыша (Демо):", userFantics)
       }
 
-      // Запрашиваем актуальный баланс с сервера после небольшой задержки
-      // Это обеспечит конечную согласованность, особенно при использовании RabbitMQ
-      const delay = API_BASE.includes("localhost") ? 1000 : 8000 // Увеличена задержка для продакшна до 8 секунд
-      console.log(`DEBUG: Задержка перед fetchUserFantics: ${delay}ms`)
-      setTimeout(() => {
-        fetchUserFantics() // Это обновит баланс с сервера
-      }, delay)
+      // === НАЧАЛО ИЗМЕНЕНИЙ ДЛЯ ПОЛЛИНГА ===
+      const expectedBalance = initialBalanceBeforeSpin - currentCase.cost + result.gift
+      const maxRetries = 10 // Максимальное количество попыток
+      const retryInterval = 1000 // Интервал между попытками в мс
+
+      console.log(`DEBUG: Ожидаемый баланс после транзакции: ${expectedBalance}`)
+      showConnectionStatus("Синхронизация баланса...")
+
+      let currentRetries = 0
+      let balanceSynced = false
+
+      while (!balanceSynced && currentRetries < maxRetries) {
+        console.log(`DEBUG: Попытка синхронизации баланса #${currentRetries + 1}`)
+        const fetchedBalance = await fetchUserFantics() // fetchUserFantics теперь возвращает баланс
+        if (fetchedBalance !== null && fetchedBalance === expectedBalance) {
+          balanceSynced = true
+          console.log("✅ Баланс успешно синхронизирован с сервером.")
+          showConnectionStatus("Баланс синхронизирован!")
+        } else {
+          console.log(
+            `DEBUG: Баланс не совпадает. Ожидаем: ${expectedBalance}, Получено: ${fetchedBalance}. Повторная попытка через ${retryInterval}ms.`,
+          )
+          await new Promise((resolve) => setTimeout(resolve, retryInterval))
+          currentRetries++
+        }
+      }
+
+      if (!balanceSynced) {
+        showNotification(
+          "⚠️ Не удалось синхронизировать баланс с сервером. Попробуйте обновить приложение.",
+          "error",
+          8000,
+        )
+        console.error("❌ Не удалось синхронизировать баланс после нескольких попыток.")
+        showConnectionStatus("Ошибка синхронизации баланса", true)
+      }
+      // === КОНЕЦ ИЗМЕНЕНИЙ ДЛЯ ПОЛЛИНГА ===
 
       setTimeout(() => {
         // Этот setTimeout для завершения свечения (1 секунда после анимации)
@@ -810,8 +884,8 @@ async function spinPrizes() {
         openBtn.classList.remove("animate-pulse")
         updateOpenButton()
         isSpinning = false
-      }, 1000)
-    }, 5000)
+      }, 1000) // Задержка для свечения
+    }, 5000) // Задержка для основной анимации
   } catch (error) {
     showNotification(`❌ Ошибка: ${error.message}`, "error")
     // В случае ошибки, если было оптимистичное списание, возвращаем баланс
