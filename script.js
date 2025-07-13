@@ -360,6 +360,7 @@ async function openCaseAPI(caseId) {
     if (response.ok) {
       const result = await response.json()
       console.log("✅ Кейс открыт:", result)
+      console.log("DEBUG: Сервер вернул выигрыш:", result.gift) // Добавлено
       showConnectionStatus("Кейс открыт!")
       return result
     } else {
@@ -644,6 +645,7 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     if (i === targetWinningIndex) {
       // Вставляем фактический выигрышный приз в целевую позицию
       rewardValue = winningGiftCost
+      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`) // Добавлено
     } else {
       const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
       rewardValue = randomReward.cost
@@ -791,6 +793,9 @@ async function spinPrizes() {
       winningElement.classList.add("winning-prize")
       console.log("DEBUG: Визуально выделенный приз (из DOM):", winningElement.textContent)
       console.log("DEBUG: Ожидаемый выигрышный приз (из API):", result.gift)
+      console.log(
+        `DEBUG: Сравнение: Выигрыш от сервера: ${result.gift}, Текст элемента: ${Number.parseInt(winningElement.textContent)}`,
+      ) // Добавлено для прямого сравнения
       showNotification(`🎉 Вы выиграли ${result.gift} 💎!`, "success", 3000)
     }
 
@@ -939,8 +944,8 @@ async function spinPrizes() {
     if (winningElement) {
       winningElement.classList.remove("winning-prize")
     }
-    // Сбрасываем transform только если он не был установлен WAAPI (fill: 'forwards' уже делает это)
-    // prizeScroll.style.transform = "translateX(0px)" // WAAPI с fill: 'forwards' уже держит конечное состояние
+    // WAAPI с fill: 'forwards' уже держит конечное состояние, поэтому явный сброс transform не нужен
+    // prizeScroll.style.transform = "translateX(0px)"
     // Перегенерируем для следующего спина, чтобы лента была "свежей"
     renderPrizeScroll(currentCase, 0)
 
