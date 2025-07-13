@@ -531,35 +531,41 @@ async function spinPrizes() {
     }
 
     renderPrizeScroll(currentCase)
+
     prizeScroll.classList.add("prize-scroll")
 
-    // Ждём 4 секунды анимации через Promise
-    await new Promise(resolve => setTimeout(resolve, 4000))
+    setTimeout(() => {
+      prizeScroll.classList.remove("prize-scroll")
 
-    prizeScroll.classList.remove("prize-scroll")
+      const centerPrize = prizeScroll.children[Math.floor(prizeScroll.children.length / 2)]
+      if (centerPrize) {
+        centerPrize.textContent = `${result.gift} 💎`
+        centerPrize.classList.add("winning-prize")
+      }
 
-    const centerPrize = prizeScroll.children[Math.floor(prizeScroll.children.length / 2)]
-    if (centerPrize) {
-      centerPrize.textContent = `${result.gift} 💎`
-      centerPrize.classList.add("winning-prize")
-    }
+      if (!demoMode) {
+        const delay = API_BASE.includes("localhost") ? 1000 : 3000
+        setTimeout(() => {
+          fetchUserFantics()
+          renderCases()
+        }, delay)
+      }
 
-    if (!demoMode) {
-      const delay = API_BASE.includes("localhost") ? 1000 : 3000
-      await new Promise(res => setTimeout(res, delay))
-      await fetchUserFantics()
-      renderCases()
-    }
+      setTimeout(() => {
+        const profit = result.profit || 0
+        const profitText = profit > 0 ? `(+${profit} 💎)` : profit < 0 ? `(${profit} 💎)` : ""
 
-    if (centerPrize) {
-      centerPrize.classList.remove("winning-prize")
-    }
+        alert(`🎉 Поздравляем! Вы выиграли: ${result.gift} 💎 ${profitText}`)
 
-    // Разблокируем кнопку сразу после окончания анимации
-    openBtn.disabled = false
-    updateOpenButton()
-    isSpinning = false
+        if (centerPrize) {
+          centerPrize.classList.remove("winning-prize")
+        }
 
+        openBtn.disabled = false
+        updateOpenButton()
+        isSpinning = false
+      }, 1000)
+    }, 4000)
   } catch (error) {
     alert(`❌ Ошибка: ${error.message}`)
     openBtn.disabled = false
@@ -567,8 +573,6 @@ async function spinPrizes() {
     isSpinning = false
   }
 }
-
-
 
 function goBack() {
   document.getElementById("casePage").classList.add("hidden")
@@ -612,3 +616,4 @@ async function initApp() {
 }
 
 initApp()
+
