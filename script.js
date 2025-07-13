@@ -785,12 +785,25 @@ async function spinPrizes() {
     // === НАЧАЛО ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ (SNAP CORRECTION) ===
     try {
       const currentTransform = window.getComputedStyle(prizeScroll).transform
-      const match = currentTransform.match(/translateX$$(-?\d+\.?\d*)px$$/) // Улучшенный regex для дробных чисел
       let currentScrollX = 0
-      if (match && match[1]) {
-        currentScrollX = Math.abs(Number.parseFloat(match[1]))
+
+      // Пробуем распарсить matrix()
+      const matrixMatch = currentTransform.match(
+        /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/,
+      )
+      if (matrixMatch && matrixMatch.length >= 6) {
+        // translateX значение находится на 5-й позиции (индекс 5 в массиве match)
+        currentScrollX = Math.abs(Number.parseFloat(matrixMatch[5]))
+        console.log("DEBUG: Parsed from matrix:", currentScrollX)
       } else {
-        console.warn("WARNING: Could not parse translateX from transform style:", currentTransform)
+        // Если не matrix, пробуем распарсить translateX()
+        const translateXMatch = currentTransform.match(/translateX$$(-?\d+\.?\d*)px$$/)
+        if (translateXMatch && translateXMatch[1]) {
+          currentScrollX = Math.abs(Number.parseFloat(translateXMatch[1]))
+          console.log("DEBUG: Parsed from translateX:", currentScrollX)
+        } else {
+          console.warn("WARNING: Could not parse transform style:", currentTransform)
+        }
       }
 
       const actualWinningElementOffsetLeft = winningElement.offsetLeft
