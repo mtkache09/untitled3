@@ -184,7 +184,7 @@ function showConnectionStatus(message, isError = false) {
 }
 
 async function fetchUserFantics() {
-  console.log("DEBUG: Начало fetchUserFantics") // ДОБАВЛЕНО
+  console.log("DEBUG: Начало fetchUserFantics")
   try {
     const userId = getUserId()
     const url = `${API_BASE}/fantics/${userId}`
@@ -194,6 +194,8 @@ async function fetchUserFantics() {
     console.log("   User ID:", userId)
     console.log("   API Base:", API_BASE)
     console.log("   Авторизация доступна:", isAuthAvailable())
+
+    // showConnectionStatus("Получение баланса...") // Убрано по запросу пользователя
 
     const response = await fetch(url, {
       method: "GET",
@@ -232,11 +234,11 @@ async function fetchUserFantics() {
     userFantics = 0
     updateFanticsDisplay()
   }
-  console.log("DEBUG: Конец fetchUserFantics") // ДОБАВЛЕНО
+  console.log("DEBUG: Конец fetchUserFantics")
 }
 
 async function fetchCases() {
-  console.log("DEBUG: Начало fetchCases") // ДОБАВЛЕНО
+  console.log("DEBUG: Начало fetchCases")
   try {
     const url = `${API_BASE}/cases`
     console.log("📡 Запрос кейсов:", url)
@@ -283,7 +285,7 @@ async function fetchCases() {
     cases = []
     renderCases()
   }
-  console.log("DEBUG: Конец fetchCases") // ДОБАВЛЕНО
+  console.log("DEBUG: Конец fetchCases")
 }
 
 // Функция для тестирования соединения и авторизации
@@ -693,19 +695,29 @@ async function spinPrizes() {
   openBtnText.textContent = "Открываем..."
   openBtn.classList.add("animate-pulse")
 
+  const initialBalanceBeforeSpin = userFantics // Сохраняем баланс до начала операции
+
   try {
     let result = null
     if (!demoMode) {
-      // Вызываем API для открытия кейса и получаем результат (включая profit)
-      result = await openCaseAPI(currentCase.id)
-      // Оптимистично обновляем баланс на UI с учетом чистого выигрыша/проигрыша
-      userFantics += result.profit // result.profit = gift - spent
+      // 1. Списываем стоимость кейса с UI сразу
+      userFantics -= currentCase.cost
       updateFanticsDisplay()
+      console.log("DEBUG: Баланс после списания стоимости кейса (UI):", userFantics)
+
+      // Вызываем API для открытия кейса (сервер сам обработает списание и добавление)
+      result = await openCaseAPI(currentCase.id)
+      console.log("DEBUG: Результат от openCaseAPI:", result)
+      // Важно: здесь мы НЕ применяем result.profit, так как стоимость уже списана.
+      // Мы добавим только gift.cost после анимации.
     } else {
       const possibleRewards = currentCase.possible_rewards
       const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
-      // Симулируем profit для демо-режима
-      result = { gift: randomReward.cost, profit: randomReward.cost - currentCase.cost }
+      result = { gift: randomReward.cost, profit: randomReward.cost - currentCase.cost } // Сохраняем profit для отладки/консистентности
+      // Для демо-режима также симулируем немедленное списание для визуальной консистентности
+      userFantics -= currentCase.cost
+      updateFanticsDisplay()
+      console.log("DEBUG: Баланс после списания стоимости кейса (Демо):", userFantics)
     }
 
     // Теперь, когда мы знаем выигрышный приз, генерируем ленту
@@ -728,9 +740,21 @@ async function spinPrizes() {
     prizeScroll.style.transform = `translateX(-${totalScrollDistance}px)`
 
     setTimeout(() => {
+      // Этот setTimeout для завершения анимации (5 секунд)
       const winningElement = prizeScroll.children[winningPrizeIndex]
       if (winningElement) {
         winningElement.classList.add("winning-prize")
+      }
+
+      // 2. Добавляем сумму выигрыша к балансу после анимации
+      if (!demoMode) {
+        userFantics += result.gift // Добавляем фактическую сумму выигрыша
+        updateFanticsDisplay()
+        console.log("DEBUG: Баланс после добавления выигрыша (UI):", userFantics)
+      } else {
+        userFantics += result.gift // Для демо-режима тоже
+        updateFanticsDisplay()
+        console.log("DEBUG: Баланс после добавления выигрыша (Демо):", userFantics)
       }
 
       // Запрашиваем актуальный баланс с сервера после небольшой задержки
@@ -741,6 +765,7 @@ async function spinPrizes() {
       }, delay)
 
       setTimeout(() => {
+        // Этот setTimeout для завершения свечения (1 секунда после анимации)
         if (winningElement) {
           winningElement.classList.remove("winning-prize")
         }
@@ -752,12 +777,17 @@ async function spinPrizes() {
         openBtn.classList.remove("animate-pulse")
         updateOpenButton()
         isSpinning = false
-      }, 1000) // Задержка перед сбросом и повторным включением кнопки
-    }, 5000) // Соответствует длительности анимации
+      }, 1000)
+    }, 5000)
   } catch (error) {
     showNotification(`❌ Ошибка: ${error.message}`, "error")
-    // В случае ошибки, получаем актуальный баланс с сервера, чтобы избежать расхождений
-    fetchUserFantics()
+    // В случае ошибки, если было оптимистичное списание, возвращаем баланс
+    if (!demoMode && initialBalanceBeforeSpin !== userFantics) {
+      userFantics = initialBalanceBeforeSpin // Возвращаем к начальному состоянию
+      updateFanticsDisplay()
+      console.log("DEBUG: Баланс восстановлен после ошибки:", userFantics)
+    }
+    fetchUserFantics() // Получаем актуальный баланс с сервера
     openBtn.disabled = false
     openBtn.classList.remove("animate-pulse")
     updateOpenButton()
@@ -796,7 +826,7 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
 })
 
 async function initApp() {
-  console.log("DEBUG: Начало initApp") // ДОБАВЛЕНО
+  console.log("DEBUG: Начало initApp")
   console.log("🚀 Инициализация приложения...")
   console.log("API URL:", API_BASE)
   console.log("Авторизация доступна:", isAuthAvailable() ? "✅ Да" : "❌ Нет")
@@ -818,12 +848,12 @@ async function initApp() {
     await testConnection()
   }
 
-  showConnectionStatus("Подключение к серверу...")
+  // showConnectionStatus("Подключение к серверу...") // УДАЛЕНО по запросу пользователя
   await fetchUserFantics()
   await fetchCases()
 
   console.log("✅ Приложение готово!")
-  console.log("DEBUG: Конец initApp") // ДОБАВЛЕНО
+  console.log("DEBUG: Конец initApp")
 }
 
 initApp()
