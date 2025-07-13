@@ -32,31 +32,33 @@ function getAuthHeaders() {
     "Content-Type": "application/json",
   }
 
-  // Проверяем доступность Telegram WebApp
+  // Получаем initData из Telegram WebApp
+  let initData = null
+
   if (window.Telegram?.WebApp?.initData) {
-    // Используем правильный формат заголовка согласно вашему бэкенду
-    headers["Authorization"] = `tgWebAppData ${window.Telegram.WebApp.initData}`
-    console.log("✅ Используем Telegram WebApp авторизацию")
-    console.log("📱 Init Data длина:", window.Telegram.WebApp.initData.length)
+    initData = window.Telegram.WebApp.initData
+    console.log("✅ Используем Telegram WebApp initData")
+    console.log("📱 Init Data длина:", initData.length)
+  } else if (window.location.search.includes("initData=")) {
+    // Для тестирования можно передать initData через URL
+    const urlParams = new URLSearchParams(window.location.search)
+    initData = urlParams.get("initData")
+    console.log("✅ Используем initData из URL параметров")
+  }
+
+  if (initData) {
+    // Используем правильный формат: Authorization: Bearer <initData>
+    headers["Authorization"] = `Bearer ${initData}`
+    console.log("🔐 Заголовок авторизации установлен")
   } else {
-    console.warn("⚠️ Telegram WebApp недоступен, используем тестовый режим")
-    // В тестовом режиме можно добавить альтернативную авторизацию
-    // Для разработки можно передать initData через query параметр
-    if (window.location.search.includes("initData=")) {
-      const urlParams = new URLSearchParams(window.location.search)
-      const initData = urlParams.get("initData")
-      if (initData) {
-        headers["Authorization"] = `tgWebAppData ${initData}`
-        console.log("✅ Используем initData из URL параметров")
-      }
-    }
+    console.warn("⚠️ Telegram WebApp initData недоступен")
   }
 
   return headers
 }
 
-// Функция для проверки доступности Telegram WebApp
-function isTelegramWebApp() {
+// Функция для проверки доступности авторизации
+function isAuthAvailable() {
   return !!window.Telegram?.WebApp?.initData || window.location.search.includes("initData=")
 }
 
@@ -88,7 +90,10 @@ function handleApiError(response, error) {
     case 401:
       showNotification("❌ Ошибка авторизации. Перезапустите приложение в Telegram", "error", 8000)
       console.error("401 Unauthorized:", error)
-      // Можно добавить логику для перезапуска приложения
+      // Показываем детали ошибки для отладки
+      if (error?.detail) {
+        console.error("Детали ошибки авторизации:", error.detail)
+      }
       break
     case 403:
       showNotification("❌ Доступ запрещен. Вы можете управлять только своим аккаунтом", "error", 5000)
@@ -182,7 +187,7 @@ async function fetchUserFantics() {
     console.log("   URL:", url)
     console.log("   User ID:", userId)
     console.log("   API Base:", API_BASE)
-    console.log("   Telegram WebApp доступен:", isTelegramWebApp())
+    console.log("   Авторизация доступна:", isAuthAvailable())
 
     showConnectionStatus("Получение баланса...")
 
@@ -212,8 +217,8 @@ async function fetchUserFantics() {
     console.error("   Тип ошибки:", error.name)
     console.error("   Сообщение:", error.message)
 
-    if (!isTelegramWebApp()) {
-      showConnectionStatus("Доступно только в Telegram WebApp", true)
+    if (!isAuthAvailable()) {
+      showConnectionStatus("Требуется авторизация Telegram", true)
       showNotification("⚠️ Приложение работает только в Telegram", "error", 8000)
     } else {
       showConnectionStatus("Сервер недоступен", true)
@@ -274,24 +279,26 @@ async function fetchCases() {
   }
 }
 
-// Функция для тестирования соединения
+// Функция для тестирования соединения и авторизации
 async function testConnection() {
-  console.log("=== ТЕСТ СОЕДИНЕНИЯ С API ===")
+  console.log("=== ТЕСТ СОЕДИНЕНИЯ И АВТОРИЗАЦИИ ===")
   console.log("API Base:", API_BASE)
   console.log("User ID:", getUserId())
-  console.log("Telegram WebApp доступен:", isTelegramWebApp())
+  console.log("Авторизация доступна:", isAuthAvailable())
   console.log("Init Data:", window.Telegram?.WebApp?.initData ? "Есть" : "Нет")
 
+  // Показываем заголовки для отладки
+  const headers = getAuthHeaders()
+  console.log("Заголовки запроса:", headers)
+
   try {
-    // Тест 1: Проверка основного API
+    // Тест 1: Проверка основного API (не требует авторизации)
     console.log("📡 Тест 1: Проверка /")
-    const response1 = await fetch(`${API_BASE}/`, {
-      headers: getAuthHeaders(),
-    })
+    const response1 = await fetch(`${API_BASE}/`)
     const data1 = await response1.json()
     console.log("✅ Основной API:", data1)
 
-    // Тест 2: Проверка fantics
+    // Тест 2: Проверка fantics (требует авторизации)
     console.log("📡 Тест 2: Проверка /fantics/")
     const userId = getUserId()
     const response2 = await fetch(`${API_BASE}/fantics/${userId}`, {
@@ -303,10 +310,10 @@ async function testConnection() {
       console.log("✅ Fantics endpoint:", data2)
     } else {
       const error2 = await response2.json()
-      console.log("❌ Fantics endpoint error:", error2)
+      console.log("❌ Fantics endpoint error:", response2.status, error2)
     }
 
-    // Тест 3: Проверка кейсов
+    // Тест 3: Проверка кейсов (может не требовать авторизации)
     console.log("📡 Тест 3: Проверка /cases")
     const response3 = await fetch(`${API_BASE}/cases`, {
       headers: getAuthHeaders(),
@@ -314,10 +321,10 @@ async function testConnection() {
 
     if (response3.ok) {
       const data3 = await response3.json()
-      console.log("✅ Cases endpoint:", data3)
+      console.log("✅ Cases endpoint:", data3.length, "кейсов")
     } else {
       const error3 = await response3.json()
-      console.log("❌ Cases endpoint error:", error3)
+      console.log("❌ Cases endpoint error:", response3.status, error3)
     }
   } catch (error) {
     console.error("❌ Ошибка тестирования:", error)
@@ -368,8 +375,8 @@ async function addFantics(amount) {
     const userId = getUserId()
     console.log("📡 Пополнение баланса:", amount, "для пользователя:", userId)
 
-    // Проверяем доступность Telegram WebApp для операций с деньгами
-    if (!isTelegramWebApp()) {
+    // Проверяем доступность авторизации для операций с деньгами
+    if (!isAuthAvailable()) {
       throw new Error("Пополнение доступно только в Telegram WebApp")
     }
 
@@ -765,14 +772,17 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
 async function initApp() {
   console.log("🚀 Инициализация приложения...")
   console.log("API URL:", API_BASE)
-  console.log("Telegram WebApp статус:", isTelegramWebApp() ? "✅ Доступен" : "❌ Недоступен")
+  console.log("Авторизация доступна:", isAuthAvailable() ? "✅ Да" : "❌ Нет")
 
   if (window.Telegram?.WebApp?.initData) {
     console.log("📱 Init Data длина:", window.Telegram.WebApp.initData.length)
+    // Показываем первые и последние символы для отладки
+    const initData = window.Telegram.WebApp.initData
+    console.log("📱 Init Data preview:", initData.substring(0, 50) + "..." + initData.substring(initData.length - 50))
   }
 
-  // Показываем предупреждение если не в Telegram
-  if (!isTelegramWebApp()) {
+  // Показываем предупреждение если нет авторизации
+  if (!isAuthAvailable()) {
     showNotification("⚠️ Для полной функциональности откройте в Telegram", "info", 8000)
   }
 
