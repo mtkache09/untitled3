@@ -531,39 +531,35 @@ async function spinPrizes() {
     }
 
     renderPrizeScroll(currentCase)
-
     prizeScroll.classList.add("prize-scroll")
 
-    // Ждём 4 секунды анимации
-    setTimeout(async () => {
-      prizeScroll.classList.remove("prize-scroll")
+    // Ждём 4 секунды анимации через Promise
+    await new Promise(resolve => setTimeout(resolve, 4000))
 
-      const centerPrize = prizeScroll.children[Math.floor(prizeScroll.children.length / 2)]
-      if (centerPrize) {
-        centerPrize.textContent = `${result.gift} 💎`
-        centerPrize.classList.add("winning-prize")
-      }
+    prizeScroll.classList.remove("prize-scroll")
 
-      if (!demoMode) {
-        const delay = API_BASE.includes("localhost") ? 1000 : 3000
-        await new Promise(res => setTimeout(res, delay)) // ждем перед обновлением баланса
-        await fetchUserFantics()
-        renderCases()
-      }
+    const centerPrize = prizeScroll.children[Math.floor(prizeScroll.children.length / 2)]
+    if (centerPrize) {
+      centerPrize.textContent = `${result.gift} 💎`
+      centerPrize.classList.add("winning-prize")
+    }
 
-      const profit = result.profit || 0
-      const profitText = profit > 0 ? `(+${profit} 💎)` : profit < 0 ? `(${profit} 💎)` : ""
+    if (!demoMode) {
+      const delay = API_BASE.includes("localhost") ? 1000 : 3000
+      await new Promise(res => setTimeout(res, delay))
+      await fetchUserFantics()
+      renderCases()
+    }
 
-      alert(`🎉 Поздравляем! Вы выиграли: ${result.gift} 💎 ${profitText}`)
+    if (centerPrize) {
+      centerPrize.classList.remove("winning-prize")
+    }
 
-      if (centerPrize) {
-        centerPrize.classList.remove("winning-prize")
-      }
+    // Разблокируем кнопку сразу после окончания анимации
+    openBtn.disabled = false
+    updateOpenButton()
+    isSpinning = false
 
-      openBtn.disabled = false
-      updateOpenButton()
-      isSpinning = false
-    }, 4000)
   } catch (error) {
     alert(`❌ Ошибка: ${error.message}`)
     openBtn.disabled = false
@@ -571,6 +567,7 @@ async function spinPrizes() {
     isSpinning = false
   }
 }
+
 
 
 function goBack() {
