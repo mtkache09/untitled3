@@ -478,16 +478,16 @@ function renderCases() {
     }
 
     caseElement.innerHTML = `
-      <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
-          <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
-      </div>
-      <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
-      <div class="flex items-center justify-center gap-1">
-          <span class="text-purple-400">💎</span>
-          <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
-      </div>
-      ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
-  `
+    <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
+        <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
+    </div>
+    <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
+    <div class="flex items-center justify-center gap-1">
+        <span class="text-purple-400">💎</span>
+        <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
+    </div>
+    ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
+`
 
     if (canAfford) {
       caseElement.addEventListener("click", () => openCasePage(caseItem))
@@ -510,11 +510,11 @@ function renderDepositAmounts() {
     const totalAmount = item.amount + item.bonus
 
     amountElement.innerHTML = `
-      ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
-      <div class="text-white font-bold text-lg">${item.amount} 💎</div>
-      ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
-      ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
-  `
+    ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
+    <div class="text-white font-bold text-lg">${item.amount} 💎</div>
+    ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
+    ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
+`
 
     amountElement.addEventListener("click", (e) => selectDepositAmount(item, e))
     depositAmountsContainer.appendChild(amountElement)
@@ -539,18 +539,42 @@ function selectDepositAmount(item, event) {
 function updateDepositButton() {
   const confirmBtn = document.getElementById("confirmDepositBtn")
   const btnText = document.getElementById("depositBtnText")
-  const customAmount = document.getElementById("customAmount").value
+  const customAmountInput = document.getElementById("customAmount")
+  const depositSummary = document.getElementById("depositSummary")
+
+  let amountToDisplay = 0
+  let bonusToDisplay = 0
+  let totalToDisplay = 0
 
   if (selectedDepositAmount) {
-    const totalAmount = selectedDepositAmount.amount + selectedDepositAmount.bonus
-    btnText.textContent = `Пополнить на ${totalAmount} 💎`
+    amountToDisplay = selectedDepositAmount.amount
+    bonusToDisplay = selectedDepositAmount.bonus
+    totalToDisplay = amountToDisplay + bonusToDisplay
+  } else {
+    const customAmount = Number.parseInt(customAmountInput.value)
+    if (customAmount && customAmount > 0) {
+      amountToDisplay = customAmount
+      totalToDisplay = customAmount // Для кастомной суммы бонуса нет
+    }
+  }
+
+  if (totalToDisplay > 0) {
+    btnText.textContent = `Пополнить на ${totalToDisplay.toLocaleString()} 💎`
     confirmBtn.disabled = false
-  } else if (customAmount && customAmount > 0) {
-    btnText.textContent = `Пополнить на ${customAmount} 💎`
-    confirmBtn.disabled = false
+
+    let summaryText = `Вы собираетесь пополнить: ${amountToDisplay.toLocaleString()} 💎`
+    if (bonusToDisplay > 0) {
+      summaryText += ` (+${bonusToDisplay.toLocaleString()} 💎 бонус)`
+    }
+    summaryText += `. Итого: ${totalToDisplay.toLocaleString()} 💎`
+
+    depositSummary.textContent = summaryText
+    depositSummary.classList.remove("hidden")
   } else {
     btnText.textContent = "Выберите сумму"
     confirmBtn.disabled = true
+    depositSummary.classList.add("hidden")
+    depositSummary.textContent = ""
   }
 }
 
@@ -558,13 +582,14 @@ function openDepositModal() {
   document.getElementById("depositModal").classList.remove("hidden")
   renderDepositAmounts()
   updateFanticsDisplay()
+  updateDepositButton() // Обновляем кнопку и сводку при открытии
 }
 
 function closeDepositModal() {
   document.getElementById("depositModal").classList.add("hidden")
   selectedDepositAmount = null
   document.getElementById("customAmount").value = ""
-  updateDepositButton()
+  updateDepositButton() // Обновляем кнопку и сводку при закрытии
 }
 
 async function processDeposit() {
@@ -695,9 +720,9 @@ function renderPossiblePrizes(caseData) {
 
     prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
     prizeElement.innerHTML = `
-      <div class="font-bold">${reward.cost} 💎</div>
-      <div class="text-xs opacity-75">${reward.probability}%</div>
-  `
+    <div class="font-bold">${reward.cost} 💎</div>
+    <div class="text-xs opacity-75">${reward.probability}%</div>
+`
     possiblePrizes.appendChild(prizeElement)
   })
 }
