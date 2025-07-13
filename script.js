@@ -892,68 +892,58 @@ async function spinPrizes() {
     }
 
     // === НАЧАЛО ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ (SNAP CORRECTION) ===
-    // С WAAPI потребность в подгонке может быть меньше, но оставим ее для максимальной точности
     try {
-      const winningElementRect = winningElement.getBoundingClientRect()
-      const viewportRect = viewport.getBoundingClientRect()
+      const viewport = prizeScroll.parentElement
+      const viewportWidth = viewport.offsetWidth
 
-      console.log("DEBUG: Snap Correction - winningElementRect:", winningElementRect)
-      console.log("DEBUG: Snap Correction - viewportRect:", viewportRect)
+      // Вычисляем точное желаемое значение translateX для центрирования выигрышного элемента
+      // Это отрицательное значение расстояния от левого края prizeScroll до желаемой центральной точки.
+      // Желаемая центральная точка: (winningElement.offsetLeft + winningElement.offsetWidth / 2)
+      // минус половина ширины viewport, чтобы выровнять ее по центру viewport.
+      const desiredTranslateXForCentering = -(
+        winningElement.offsetLeft +
+        winningElement.offsetWidth / 2 -
+        viewportWidth / 2
+      )
 
-      // Calculate the current center of the winning element relative to the viewport's left edge
-      const currentWinningElementCenterInViewport =
-        winningElementRect.left + winningElementRect.width / 2 - viewportRect.left
-
-      // Calculate the desired center of the viewport relative to its left edge
-      const desiredViewportCenter = viewportRect.width / 2
-
-      // Calculate the offset needed to bring the winning element's center to the viewport's center
-      const offsetToCenter = currentWinningElementCenterInViewport - desiredViewportCenter
-
-      // Get the current transform value directly from the element's style (set by WAAPI)
+      // Получаем текущее фактическое значение transform из стиля элемента (установленное WAAPI)
       const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
-      let currentTranslateX = 0
-
-      console.log("DEBUG: Raw transform style for snap correction:", currentTransformStyle)
+      let actualCurrentTranslateX = 0
 
       const matrixMatch = currentTransformStyle.match(
         /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/,
       )
       if (matrixMatch && matrixMatch.length >= 6) {
-        console.log("DEBUG: matrixMatch[5] for snap correction:", matrixMatch[5]) // Добавлен лог
-        currentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
-        console.log("DEBUG: Parsed from matrix (currentTranslateX):", currentTranslateX)
+        actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
       } else {
         const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
         if (translateXMatch && translateXMatch[1]) {
-          currentTranslateX = Number.parseFloat(translateXMatch[1])
-          console.log("DEBUG: Parsed from translateX (currentTranslateX):", currentTranslateX)
+          actualCurrentTranslateX = Number.parseFloat(translateXMatch[1])
         } else {
           console.warn(
             "WARNING: Could not parse transform style for snap correction, unexpected format:",
             currentTransformStyle,
           )
-          currentTranslateX = 0
+          // В случае сбоя парсинга, используем предполагаемое конечное положение
+          actualCurrentTranslateX = -totalScrollDistance
         }
       }
 
-      // The new translateX value should be the current one minus the offset needed to center
-      const newTranslateX = currentTranslateX - offsetToCenter
+      // Вычисляем разницу между фактическим текущим положением и желаемым центрированным положением
+      const adjustmentNeeded = desiredTranslateXForCentering - actualCurrentTranslateX
 
-      console.log("DEBUG: currentWinningElementCenterInViewport:", currentWinningElementCenterInViewport)
-      console.log("DEBUG: desiredViewportCenter:", desiredViewportCenter)
-      console.log("DEBUG: offsetToCenter (how much winning element is off center):", offsetToCenter)
-      console.log("DEBUG: currentTranslateX (from prizeScroll style):", currentTranslateX)
-      console.log("DEBUG: newTranslateX (calculated for snap):", newTranslateX)
+      console.log("DEBUG: Snap Correction - desiredTranslateXForCentering:", desiredTranslateXForCentering)
+      console.log("DEBUG: Snap Correction - actualCurrentTranslateX (from style):", actualCurrentTranslateX)
+      console.log("DEBUG: Snap Correction - adjustmentNeeded:", adjustmentNeeded)
 
-      if (Math.abs(offsetToCenter) > 0.5) {
-        // Apply correction if offset is significant (e.g., more than 0.5px)
-        prizeScroll.style.transition = "transform 0.1s ease-out"
-        prizeScroll.style.transform = `translateX(${newTranslateX}px)`
-        console.log("DEBUG: Applied snap adjustment to:", newTranslateX)
-        await new Promise((resolve) => setTimeout(resolve, 100)) // Wait for correction to finish
+      // Применяем коррекцию, если отклонение значительное (например, более 0.5px)
+      if (Math.abs(adjustmentNeeded) > 0.5) {
+        prizeScroll.style.transition = "transform 0.1s ease-out" // Плавный переход для подгонки
+        prizeScroll.style.transform = `translateX(${desiredTranslateXForCentering}px)`
+        console.log("DEBUG: Applied snap adjustment to exact desired position:", desiredTranslateXForCentering)
+        await new Promise((resolve) => setTimeout(resolve, 100)) // Ждем завершения коррекции
       } else {
-        console.log("DEBUG: Snap adjustment not needed, offset is minimal:", offsetToCenter)
+        console.log("DEBUG: Snap adjustment not needed, offset is minimal:", adjustmentNeeded)
       }
     } catch (snapError) {
       console.error("ERROR: Ошибка в логике подгонки (snap correction):", snapError)
