@@ -534,7 +534,8 @@ async function spinPrizes() {
 
     prizeScroll.classList.add("prize-scroll")
 
-    setTimeout(() => {
+    // Ждём 4 секунды анимации
+    setTimeout(async () => {
       prizeScroll.classList.remove("prize-scroll")
 
       const centerPrize = prizeScroll.children[Math.floor(prizeScroll.children.length / 2)]
@@ -545,26 +546,23 @@ async function spinPrizes() {
 
       if (!demoMode) {
         const delay = API_BASE.includes("localhost") ? 1000 : 3000
-        setTimeout(() => {
-          fetchUserFantics()
-          renderCases()
-        }, delay)
+        await new Promise(res => setTimeout(res, delay)) // ждем перед обновлением баланса
+        await fetchUserFantics()
+        renderCases()
       }
 
-      setTimeout(() => {
-        const profit = result.profit || 0
-        const profitText = profit > 0 ? `(+${profit} 💎)` : profit < 0 ? `(${profit} 💎)` : ""
+      const profit = result.profit || 0
+      const profitText = profit > 0 ? `(+${profit} 💎)` : profit < 0 ? `(${profit} 💎)` : ""
 
-        alert(`🎉 Поздравляем! Вы выиграли: ${result.gift} 💎 ${profitText}`)
+      alert(`🎉 Поздравляем! Вы выиграли: ${result.gift} 💎 ${profitText}`)
 
-        if (centerPrize) {
-          centerPrize.classList.remove("winning-prize")
-        }
+      if (centerPrize) {
+        centerPrize.classList.remove("winning-prize")
+      }
 
-        openBtn.disabled = false
-        updateOpenButton()
-        isSpinning = false
-      }, 1000)
+      openBtn.disabled = false
+      updateOpenButton()
+      isSpinning = false
     }, 4000)
   } catch (error) {
     alert(`❌ Ошибка: ${error.message}`)
@@ -573,6 +571,7 @@ async function spinPrizes() {
     isSpinning = false
   }
 }
+
 
 function goBack() {
   document.getElementById("casePage").classList.add("hidden")
