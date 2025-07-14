@@ -929,7 +929,7 @@ async function spinPrizes() {
 
       console.log("DEBUG: Snap Correction - Raw transform style:", currentTransformStyle)
 
-      // Corrected regex for matrix parsing: escaped parentheses
+      // Corrected regex for matrix parsing: using escaped parentheses
       const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
       const matrixMatch = currentTransformStyle.match(matrixRegex)
 
@@ -938,7 +938,7 @@ async function spinPrizes() {
         console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5])
         actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
       } else {
-        // Corrected regex for translateX parsing: escaped parentheses
+        // Corrected regex for translateX parsing: using escaped parentheses
         const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
         if (translateXMatch && translateXMatch[1]) {
           actualCurrentTranslateX = Number.parseFloat(translateXMatch[1])
