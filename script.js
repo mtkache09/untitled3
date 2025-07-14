@@ -917,15 +917,15 @@ async function spinPrizes() {
       const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
       let actualCurrentTranslateX = 0
 
-      console.log("DEBUG: Raw transform style for snap correction:", currentTransformStyle)
+      console.log("DEBUG: Snap Correction - Raw transform style:", currentTransformStyle)
 
       // Corrected regex for matrix parsing: escaped parentheses
-      const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
+      const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$$/
       const matrixMatch = currentTransformStyle.match(matrixRegex)
 
       if (matrixMatch && matrixMatch.length >= 6) {
-        console.log("DEBUG: matrixMatch found:", matrixMatch)
-        console.log("DEBUG: matrixMatch[5] (translateX):", matrixMatch[5])
+        console.log("DEBUG: Snap Correction - matrixMatch found:", matrixMatch)
+        console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5])
         actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
       } else {
         // Corrected regex for translateX parsing: escaped parentheses
@@ -934,7 +934,7 @@ async function spinPrizes() {
           actualCurrentTranslateX = Number.parseFloat(translateXMatch[1])
         } else {
           console.warn(
-            "WARNING: Could not parse transform style for snap correction, unexpected format:",
+            "WARNING: Snap Correction - Could not parse transform style, unexpected format:",
             currentTransformStyle,
           )
           // In case of parsing failure, use the assumed final position
@@ -945,6 +945,9 @@ async function spinPrizes() {
       // Вычисляем разницу между фактическим текущим положением и желаемым центрированным положением
       const adjustmentNeeded = desiredTranslateXForCentering - actualCurrentTranslateX
 
+      console.log("DEBUG: Snap Correction - winningElement.offsetLeft:", winningElement.offsetLeft)
+      console.log("DEBUG: Snap Correction - winningElement.offsetWidth:", winningElement.offsetWidth)
+      console.log("DEBUG: Snap Correction - viewportWidth:", viewportWidth)
       console.log("DEBUG: Snap Correction - desiredTranslateXForCentering:", desiredTranslateXForCentering)
       console.log("DEBUG: Snap Correction - actualCurrentTranslateX (from style):", actualCurrentTranslateX)
       console.log("DEBUG: Snap Correction - adjustmentNeeded:", adjustmentNeeded)
@@ -953,10 +956,13 @@ async function spinPrizes() {
       if (Math.abs(adjustmentNeeded) > 0.5) {
         prizeScroll.style.transition = "transform 0.1s ease-out" // Плавный переход для подгонки
         prizeScroll.style.transform = `translateX(${desiredTranslateXForCentering}px)`
-        console.log("DEBUG: Applied snap adjustment to exact desired position:", desiredTranslateXForCentering)
+        console.log(
+          "DEBUG: Snap Correction - Applied adjustment to exact desired position:",
+          desiredTranslateXForCentering,
+        )
         await new Promise((resolve) => setTimeout(resolve, 100)) // Ждем завершения коррекции
       } else {
-        console.log("DEBUG: Snap adjustment not needed, offset is minimal:", adjustmentNeeded)
+        console.log("DEBUG: Snap Correction - adjustment not needed, offset is minimal:", adjustmentNeeded)
       }
     } catch (snapError) {
       console.error("ERROR: Ошибка в логике подгонки (snap correction):", snapError)
