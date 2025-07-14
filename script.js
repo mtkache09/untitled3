@@ -360,6 +360,7 @@ async function openCaseAPI(caseId) {
     if (response.ok) {
       const result = await response.json()
       console.log("✅ Кейс открыт:", result)
+      console.log("DEBUG: Сервер вернул выигрыш:", result.gift) // Добавлено
       showConnectionStatus("Кейс открыт!")
       return result
     } else {
@@ -449,15 +450,22 @@ function renderCases() {
   const casesGrid = document.getElementById("casesGrid")
   casesGrid.innerHTML = ""
 
+  // REMOVED TEMPORARY DEBUG STYLE: casesGrid.style.backgroundColor = "rgba(255, 0, 0, 0.2)"
+  console.log("DEBUG: casesGrid background check removed.")
+
   if (cases.length === 0) {
     casesGrid.innerHTML = '<div class="col-span-2 text-center text-gray-400 py-8">Нет доступных кейсов</div>'
+    console.log("DEBUG: No cases to render, displaying 'Нет доступных кейсов'.")
     return
   }
+
+  console.log(`DEBUG: Attempting to render ${cases.length} cases.`)
 
   cases.forEach((caseItem) => {
     const canAfford = userFantics >= caseItem.cost
 
     const caseElement = document.createElement("div")
+    // Corrected class for affordability:
     caseElement.className = `cursor-pointer transition-all duration-300 hover-scale bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-4 text-center ${
       canAfford
         ? "hover:shadow-xl hover:shadow-purple-500/20 hover:border-purple-500/50"
@@ -477,23 +485,25 @@ function renderCases() {
     }
 
     caseElement.innerHTML = `
-      <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
-          <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
-      </div>
-      <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
-      <div class="flex items-center justify-center gap-1">
-          <span class="text-purple-400">💎</span>
-          <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
-      </div>
-      ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
-  `
+    <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
+        <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
+    </div>
+    <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
+    <div class="flex items-center justify-center gap-1">
+        <span class="text-purple-400">💎</span>
+        <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
+    </div>
+    ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
+`
 
     if (canAfford) {
       caseElement.addEventListener("click", () => openCasePage(caseItem))
     }
 
     casesGrid.appendChild(caseElement)
+    console.log(`DEBUG: Appended case: ${caseItem.name}`)
   })
+  console.log(`DEBUG: Total children in casesGrid after rendering: ${casesGrid.children.length}`)
 }
 
 function renderDepositAmounts() {
@@ -509,11 +519,11 @@ function renderDepositAmounts() {
     const totalAmount = item.amount + item.bonus
 
     amountElement.innerHTML = `
-      ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
-      <div class="text-white font-bold text-lg">${item.amount} 💎</div>
-      ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
-      ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
-  `
+    ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
+    <div class="text-white font-bold text-lg">${item.amount} 💎</div>
+    ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
+    ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
+`
 
     amountElement.addEventListener("click", (e) => selectDepositAmount(item, e))
     depositAmountsContainer.appendChild(amountElement)
@@ -538,18 +548,42 @@ function selectDepositAmount(item, event) {
 function updateDepositButton() {
   const confirmBtn = document.getElementById("confirmDepositBtn")
   const btnText = document.getElementById("depositBtnText")
-  const customAmount = document.getElementById("customAmount").value
+  const customAmountInput = document.getElementById("customAmount")
+  const depositSummary = document.getElementById("depositSummary")
+
+  let amountToDisplay = 0
+  let bonusToDisplay = 0
+  let totalToDisplay = 0
 
   if (selectedDepositAmount) {
-    const totalAmount = selectedDepositAmount.amount + selectedDepositAmount.bonus
-    btnText.textContent = `Пополнить на ${totalAmount} 💎`
+    amountToDisplay = selectedDepositAmount.amount
+    bonusToDisplay = selectedDepositAmount.bonus
+    totalToDisplay = amountToDisplay + bonusToDisplay
+  } else {
+    const customAmount = Number.parseInt(customAmountInput.value)
+    if (customAmount && customAmount > 0) {
+      amountToDisplay = customAmount
+      totalToDisplay = customAmount // Для кастомной суммы бонуса нет
+    }
+  }
+
+  if (totalToDisplay > 0) {
+    btnText.textContent = `Пополнить на ${totalToDisplay.toLocaleString()} 💎`
     confirmBtn.disabled = false
-  } else if (customAmount && customAmount > 0) {
-    btnText.textContent = `Пополнить на ${customAmount} 💎`
-    confirmBtn.disabled = false
+
+    let summaryText = `Вы собираетесь пополнить: ${amountToDisplay.toLocaleString()} 💎`
+    if (bonusToDisplay > 0) {
+      summaryText += ` (+${bonusToDisplay.toLocaleString()} 💎 бонус)`
+    }
+    summaryText += `. Итого: ${totalToDisplay.toLocaleString()} 💎`
+
+    depositSummary.textContent = summaryText
+    depositSummary.classList.remove("hidden")
   } else {
     btnText.textContent = "Выберите сумму"
     confirmBtn.disabled = true
+    depositSummary.classList.add("hidden")
+    depositSummary.textContent = ""
   }
 }
 
@@ -557,13 +591,14 @@ function openDepositModal() {
   document.getElementById("depositModal").classList.remove("hidden")
   renderDepositAmounts()
   updateFanticsDisplay()
+  updateDepositButton() // Обновляем кнопку и сводку при открытии
 }
 
 function closeDepositModal() {
   document.getElementById("depositModal").classList.add("hidden")
   selectedDepositAmount = null
   document.getElementById("customAmount").value = ""
-  updateDepositButton()
+  updateDepositButton() // Обновляем кнопку и сводку при закрытии
 }
 
 async function processDeposit() {
@@ -637,6 +672,8 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     targetWinningIndex,
   )
 
+  const lastTwoRewards = [null, null] // Для отслеживания последних двух призов
+
   for (let i = 0; i < numPrizes; i++) {
     const prizeElement = document.createElement("div")
     let rewardValue
@@ -644,10 +681,25 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     if (i === targetWinningIndex) {
       // Вставляем фактический выигрышный приз в целевую позицию
       rewardValue = winningGiftCost
+      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`)
     } else {
-      const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
-      rewardValue = randomReward.cost
+      let randomReward
+      let attempts = 0
+      do {
+        randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
+        rewardValue = randomReward.cost
+        attempts++
+        // Защита от бесконечного цикла, если нет других призов
+        if (attempts > 50 && possibleRewards.length > 1) {
+          console.warn("WARNING: Не удалось найти уникальный приз после 50 попыток. Возможно, мало вариантов призов.")
+          break
+        }
+      } while (lastTwoRewards[0] === rewardValue && lastTwoRewards[1] === rewardValue)
     }
+
+    // Обновляем историю последних двух призов
+    lastTwoRewards[0] = lastTwoRewards[1]
+    lastTwoRewards[1] = rewardValue
 
     let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
     if (rewardValue >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
@@ -677,9 +729,9 @@ function renderPossiblePrizes(caseData) {
 
     prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
     prizeElement.innerHTML = `
-      <div class="font-bold">${reward.cost} 💎</div>
-      <div class="text-xs opacity-75">${reward.probability}%</div>
-  `
+    <div class="font-bold">${reward.cost} 💎</div>
+    <div class="text-xs opacity-75">${reward.probability}%</div>
+`
     possiblePrizes.appendChild(prizeElement)
   })
 }
@@ -705,6 +757,8 @@ async function spinPrizes() {
   const initialBalanceBeforeSpin = userFantics // Сохраняем баланс до начала операции
 
   let winningElement = null // Объявляем здесь, чтобы был доступен в finally
+  let animationFrameId // Для отслеживания requestAnimationFrame
+  let animation // Объявляем здесь, чтобы был доступен в monitorAnimation
 
   try {
     let result = null
@@ -741,54 +795,93 @@ async function spinPrizes() {
     const viewport = prizeScroll.parentElement
     const viewportWidth = viewport.offsetWidth
 
-    const firstItem = prizeScroll.children[0]
-    const itemWidth = firstItem.offsetWidth
-    const computedStyle = window.getComputedStyle(firstItem)
-    const marginRight = Number.parseFloat(computedStyle.marginRight)
-    const effectiveItemWidth = itemWidth + marginRight
+    // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ ШИРИНЫ ЭЛЕМЕНТА (w-20 = 80px)
+    const itemWidth = 80
+    // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
+    const gapValue = 16 // Tailwind's gap-4 is 16px
+
+    // Корректный расчет эффективной ширины элемента, включая gap
+    const effectiveItemWidth = itemWidth + gapValue
+
+    console.log("DEBUG: Hardcoded itemWidth (w-20):", itemWidth)
+    console.log("DEBUG: Hardcoded gapValue:", gapValue)
+    console.log("DEBUG: Effective item width (calculated):", effectiveItemWidth)
 
     const winningElementCenterPosition = winningElement.offsetLeft + winningElement.offsetWidth / 2
     const desiredScrollPosition = winningElementCenterPosition - viewportWidth / 2
 
     const extraFullSpins = 5
-    const totalScrollDistance = desiredScrollPosition + extraFullSpins * viewportWidth
+    // totalScrollDistance теперь использует корректный effectiveItemWidth
+    const totalScrollDistance =
+      desiredScrollPosition + extraFullSpins * prizeScroll.children.length * effectiveItemWidth
 
-    console.log("DEBUG: Measured itemWidth:", itemWidth)
-    console.log("DEBUG: Measured marginRight:", marginRight)
-    console.log("DEBUG: Effective item width:", effectiveItemWidth)
     console.log("DEBUG: winningElement.offsetLeft:", winningElement.offsetLeft)
     console.log("DEBUG: winningElement.offsetWidth:", winningElement.offsetWidth)
     console.log("DEBUG: winningElementCenterPosition:", winningElementCenterPosition)
     console.log("DEBUG: viewportWidth:", viewportWidth)
     console.log("DEBUG: desiredScrollPosition:", desiredScrollPosition)
-    console.log("DEBUG: extraFullSpins * viewportWidth:", extraFullSpins * viewportWidth)
+    console.log(
+      "DEBUG: extraFullSpins * prizeScroll.children.length * effectiveItemWidth:",
+      extraFullSpins * prizeScroll.children.length * effectiveItemWidth,
+    )
     console.log("DEBUG: totalScrollDistance (calculated):", totalScrollDistance)
 
-    prizeScroll.style.transition = "none"
     // === НАЧАЛО ИЗМЕНЕНИЙ ДЛЯ WAAPI ===
     // Сбрасываем transform перед началом новой анимации
     prizeScroll.style.transform = "translateX(0px)"
-    prizeScroll.offsetHeight // Принудительная перерисовка
-
-    prizeScroll.style.transition = "transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)"
-    prizeScroll.style.transform = `translateX(-${totalScrollDistance}px)`
-
-    // Ждем завершения основной анимации
-    await new Promise((resolve) => setTimeout(resolve, 5000))
-    console.log("DEBUG: Основная анимация завершена.")
     prizeScroll.offsetHeight // Принудительная перерисовка для применения сброса
 
-    const animation = prizeScroll.animate(
+    animation = prizeScroll.animate(
       [
         { transform: "translateX(0px)" }, // Начальное состояние
         { transform: `translateX(-${totalScrollDistance}px)` }, // Конечное состояние
       ],
       {
-        duration: 5000, // 5 секунд
+        duration: 10000, // Увеличена длительность до 10 секунд
         easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Та же кривая ускорения
         fill: "forwards", // Сохранить конечное состояние после завершения
       },
     )
+
+    // === НАЧАЛО МОНИТОРИНГА АНИМАЦИИ ===
+    const logInterval = 100 // Логировать каждые 100 мс
+    let lastLogTime = 0
+
+    const monitorAnimation = (currentTime) => {
+      if (!isSpinning || animation.playState === "finished") {
+        // Остановить мониторинг, если спин завершен или анимация завершена
+        cancelAnimationFrame(animationFrameId)
+        return
+      }
+
+      if (currentTime - lastLogTime > logInterval) {
+        lastLogTime = currentTime
+
+        // Получаем текущий прогресс анимации
+        const animationProgress = animation.currentTime / animation.effect.getComputedTiming().duration
+        // Вычисляем текущий translateX на основе прогресса и totalScrollDistance
+        const currentTranslateX = animationProgress * -totalScrollDistance
+
+        const winningElementRect = winningElement.getBoundingClientRect()
+        const viewportRect = viewport.getBoundingClientRect()
+
+        // Позиция центра выигрышного элемента относительно левого края viewport
+        const currentWinningElementCenterInViewport =
+          winningElementRect.left + winningElementRect.width / 2 - viewportRect.left
+
+        const desiredViewportCenter = viewportRect.width / 2
+        const distanceToCenter = currentWinningElementCenterInViewport - desiredViewportCenter
+
+        console.log(
+          `DEBUG: Анимация - Приз ${winningElement.textContent} | Прогресс: ${(animationProgress * 100).toFixed(2)}% | Расчетный translateX: ${currentTranslateX.toFixed(2)}px | Расстояние до центра: ${distanceToCenter.toFixed(2)}px`,
+        )
+      }
+
+      animationFrameId = requestAnimationFrame(monitorAnimation)
+    }
+
+    animationFrameId = requestAnimationFrame(monitorAnimation)
+    // === КОНЕЦ МОНИТОРИНГА АНИМАЦИИ ===
 
     // Ждем точного завершения анимации
     await animation.finished
@@ -800,101 +893,76 @@ async function spinPrizes() {
       winningElement.classList.add("winning-prize")
       console.log("DEBUG: Визуально выделенный приз (из DOM):", winningElement.textContent)
       console.log("DEBUG: Ожидаемый выигрышный приз (из API):", result.gift)
-      showNotification(`🎉 Вы выиграли ${result.gift} 💎!`, "success", 3000) // Добавлено уведомление
+      console.log(
+        `DEBUG: Сравнение: Выигрыш от сервера: ${result.gift}, Текст элемента: ${Number.parseInt(winningElement.textContent)}`,
+      ) // Добавлено для прямого сравнения
       showNotification(`🎉 Вы выиграли ${result.gift} 💎!`, "success", 3000)
     }
 
     // === НАЧАЛО ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ (SNAP CORRECTION) ===
-    // С WAAPI потребность в подгонке может быть меньше, но оставим ее для максимальной точности
     try {
-      const currentTransform = window.getComputedStyle(prizeScroll).transform
-      let currentScrollX = 0
-      const winningElementRect = winningElement.getBoundingClientRect()
-      const viewportRect = viewport.getBoundingClientRect()
+      const viewport = prizeScroll.parentElement
+      const viewportWidth = viewport.offsetWidth
 
-      console.log("DEBUG: Snap Correction - winningElementRect:", winningElementRect)
-      console.log("DEBUG: Snap Correction - viewportRect:", viewportRect)
-
-      // Calculate the current center of the winning element relative to the viewport's left edge
-      const currentWinningElementCenterInViewport =
-        winningElementRect.left + winningElementRect.width / 2 - viewportRect.left
-
-      // Calculate the desired center of the viewport relative to its left edge
-      const desiredViewportCenter = viewportRect.width / 2
-
-      console.log("DEBUG: Raw transform style for snap correction:", currentTransform) // Добавлено для отладки
-      // Calculate the offset needed to bring the winning element's center to the viewport's center
-      const offsetToCenter = currentWinningElementCenterInViewport - desiredViewportCenter
-
-      // Пробуем распарсить matrix()
-      const matrixMatch = currentTransform.match(
-      // Get the current transform value directly from the element's style (set by WAAPI)
-      // WAAPI sets the final transform directly on style, so getComputedStyle might not be needed for this.
-      // However, getComputedStyle is safer for cross-browser consistency if WAAPI doesn't always set style.transform immediately.
-      const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
-      let currentTranslateX = 0
-
-      console.log("DEBUG: Raw transform style for snap correction:", currentTransformStyle)
-
-      const matrixMatch = currentTransformStyle.match(
-        /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/,
+      // Вычисляем точное желаемое значение translateX для центрирования выигрышного элемента
+      // Это отрицательное значение расстояния от левого края prizeScroll до желаемой центральной точки.
+      // Желаемая центральная точка: (winningElement.offsetLeft + winningElement.offsetWidth / 2)
+      // минус половина ширины viewport, чтобы выровнять ее по центру viewport.
+      const desiredTranslateXForCentering = -(
+        winningElement.offsetLeft +
+        winningElement.offsetWidth / 2 -
+        viewportWidth / 2
       )
+
+      const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
+      let actualCurrentTranslateX = 0
+
+      console.log("DEBUG: Snap Correction - Raw transform style:", currentTransformStyle)
+
+      // Corrected regex for matrix parsing: escaped parentheses
+      const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
+      const matrixMatch = currentTransformStyle.match(matrixRegex)
+
       if (matrixMatch && matrixMatch.length >= 6) {
-        // translateX значение находится на 5-й позиции (индекс 5 в массиве match)
-        currentScrollX = Math.abs(Number.parseFloat(matrixMatch[5]))
-        console.log("DEBUG: Parsed from matrix:", currentScrollX)
-        currentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
-        console.log("DEBUG: Parsed from matrix (currentTranslateX):", currentTranslateX)
+        console.log("DEBUG: Snap Correction - matrixMatch found:", matrixMatch)
+        console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5])
+        actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
       } else {
-        // Если не matrix, пробуем распарсить translateX()
-        const translateXMatch = currentTransform.match(/translateX$$(-?\d+\.?\d*)px$$/)
+        // Corrected regex for translateX parsing: escaped parentheses
         const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
         if (translateXMatch && translateXMatch[1]) {
-          currentScrollX = Math.abs(Number.parseFloat(translateXMatch[1]))
-          console.log("DEBUG: Parsed from translateX:", currentScrollX)
-          currentTranslateX = Number.parseFloat(translateXMatch[1])
-          console.log("DEBUG: Parsed from translateX (currentTranslateX):", currentTranslateX)
+          actualCurrentTranslateX = Number.parseFloat(translateXMatch[1])
         } else {
-          console.warn("WARNING: Could not parse transform style, unexpected format:", currentTransform)
-          // Fallback to 0 if parsing fails to prevent TypeError
-          currentScrollX = 0
           console.warn(
-            "WARNING: Could not parse transform style for snap correction, unexpected format:",
+            "WARNING: Snap Correction - Could not parse transform style, unexpected format:",
             currentTransformStyle,
           )
-          currentTranslateX = 0
+          // In case of parsing failure, use the assumed final position
+          actualCurrentTranslateX = -totalScrollDistance
         }
       }
 
-      const actualWinningElementOffsetLeft = winningElement.offsetLeft
-      const targetLeftInViewport = (viewportWidth - winningElement.offsetWidth) / 2
-      const finalAdjustment = actualWinningElementOffsetLeft - currentScrollX - targetLeftInViewport
-      // The new translateX value should be the current one minus the offset needed to center
-      const newTranslateX = currentTranslateX - offsetToCenter
+      // Вычисляем разницу между фактическим текущим положением и желаемым центрированным положением
+      const adjustmentNeeded = desiredTranslateXForCentering - actualCurrentTranslateX
 
-      console.log("DEBUG: Current scroll X (from transform):", currentScrollX)
-      console.log("DEBUG: Actual winning element offsetLeft:", actualWinningElementOffsetLeft)
-      console.log("DEBUG: Target left in viewport:", targetLeftInViewport)
-      console.log("DEBUG: Final adjustment needed:", finalAdjustment)
-      console.log("DEBUG: currentWinningElementCenterInViewport:", currentWinningElementCenterInViewport)
-      console.log("DEBUG: desiredViewportCenter:", desiredViewportCenter)
-      console.log("DEBUG: offsetToCenter (how much winning element is off center):", offsetToCenter)
-      console.log("DEBUG: currentTranslateX (from prizeScroll style):", currentTranslateX)
-      console.log("DEBUG: newTranslateX (calculated for snap):", newTranslateX)
+      console.log("DEBUG: Snap Correction - winningElement.offsetLeft:", winningElement.offsetLeft)
+      console.log("DEBUG: Snap Correction - winningElement.offsetWidth:", winningElement.offsetWidth)
+      console.log("DEBUG: Snap Correction - viewportWidth:", viewportWidth)
+      console.log("DEBUG: Snap Correction - desiredTranslateXForCentering:", desiredTranslateXForCentering)
+      console.log("DEBUG: Snap Correction - actualCurrentTranslateX (from style):", actualCurrentTranslateX)
+      console.log("DEBUG: Snap Correction - adjustmentNeeded:", adjustmentNeeded)
 
-      if (Math.abs(finalAdjustment) > 0.5) {
-        // Применяем коррекцию, если она значительна
-      if (Math.abs(offsetToCenter) > 0.5) {
-        // Apply correction if offset is significant (e.g., more than 0.5px)
-        prizeScroll.style.transition = "transform 0.1s ease-out"
-        prizeScroll.style.transform = `translateX(-${totalScrollDistance + finalAdjustment}px)`
-        console.log("DEBUG: Applied snap adjustment.")
+      // Применяем коррекцию, если отклонение значительное (например, более 0.5px)
+      if (Math.abs(adjustmentNeeded) > 0.5) {
+        prizeScroll.style.transition = "transform 0.1s ease-out" // Плавный переход для подгонки
+        prizeScroll.style.transform = `translateX(${desiredTranslateXForCentering}px)`
+        console.log(
+          "DEBUG: Snap Correction - Applied adjustment to exact desired position:",
+          desiredTranslateXForCentering,
+        )
         await new Promise((resolve) => setTimeout(resolve, 100)) // Ждем завершения коррекции
-        prizeScroll.style.transform = `translateX(${newTranslateX}px)`
-        console.log("DEBUG: Applied snap adjustment to:", newTranslateX)
-        await new Promise((resolve) => setTimeout(resolve, 100)) // Wait for correction to finish
       } else {
-        console.log("DEBUG: Snap adjustment not needed, offset is minimal:", offsetToCenter)
+        console.log("DEBUG: Snap Correction - adjustment not needed, offset is minimal:", adjustmentNeeded)
       }
     } catch (snapError) {
       console.error("ERROR: Ошибка в логике подгонки (snap correction):", snapError)
@@ -976,10 +1044,12 @@ async function spinPrizes() {
     if (winningElement) {
       winningElement.classList.remove("winning-prize")
     }
-    prizeScroll.style.transition = "none"
-    prizeScroll.style.transform = "translateX(0px)"
-    // Сбрасываем transform только если он не был установлен WAAPI (fill: 'forwards' уже делает это)
-    // prizeScroll.style.transform = "translateX(0px)" // WAAPI с fill: 'forwards' уже держит конечное состояние
+    // Отменяем мониторинг анимации
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId)
+    }
+    // WAAPI с fill: 'forwards' уже держит конечное состояние, поэтому явный сброс transform не нужен
+    // prizeScroll.style.transform = "translateX(0px)"
     // Перегенерируем для следующего спина, чтобы лента была "свежей"
     renderPrizeScroll(currentCase, 0)
 
