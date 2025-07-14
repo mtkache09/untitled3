@@ -387,14 +387,16 @@ async function addFantics(amount) {
 
     showConnectionStatus("Пополнение баланса...")
 
-    const response = await fetch(`${API_BASE}/fantics/add`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        amount: amount,
-      }),
-      mode: "cors",
-    })
+   const response = await fetch(`${API_BASE}/fantics/add`, {
+  method: "POST",
+  headers: getAuthHeaders(),
+  body: JSON.stringify({
+    user_id: getUserId(),  // <- добавить сюда user_id
+    amount: amount,
+  }),
+  mode: "cors",
+});
+
 
     console.log("📡 Ответ сервера (пополнение):", response.status)
 
