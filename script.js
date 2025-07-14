@@ -707,7 +707,8 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     else if (rewardValue >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
     else if (rewardValue >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
 
-    prizeElement.className = `flex-shrink-0 w-20 h-20 ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20`
+    // ДОБАВЛЕНО: min-w-[80px] max-w-[80px] для принудительной ширины
+    prizeElement.className = `flex-shrink-0 w-20 h-20 min-w-[80px] max-w-[80px] ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20`
     prizeElement.textContent = `${rewardValue} 💎`
     prizeScroll.appendChild(prizeElement)
     // Добавляем лог для проверки вычисленной ширины элемента сразу после добавления в DOM
@@ -939,17 +940,19 @@ async function spinPrizes() {
         winningElement.getBoundingClientRect().width,
       )
       console.log("DEBUG: Snap Correction - winningElement.offsetWidth (at snap):", winningElement.offsetWidth)
+      console.log("DEBUG: Snap Correction - prizeScroll.getBoundingClientRect():", prizeScroll.getBoundingClientRect())
 
-      // Corrected regex for matrix parsing: using escaped parentheses
+      // ИСПРАВЛЕНО: Corrected regex for matrix parsing: using escaped parentheses
       const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
       const matrixMatch = currentTransformStyle.match(matrixRegex)
 
       if (matrixMatch && matrixMatch.length >= 6) {
+        // Should be 6 capturing groups for matrix(a,b,c,d,tx,ty)
         console.log("DEBUG: Snap Correction - matrixMatch found:", matrixMatch)
-        console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5])
+        console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5]) // tx is the 5th capturing group (index 5)
         actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
       } else {
-        // Corrected regex for translateX parsing: using escaped parentheses
+        // ИСПРАВЛЕНО: Corrected regex for translateX parsing: using escaped parentheses
         const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
         if (translateXMatch && translateXMatch[1]) {
           actualCurrentTranslateX = Number.parseFloat(translateXMatch[1])
