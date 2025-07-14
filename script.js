@@ -360,7 +360,6 @@ async function openCaseAPI(caseId) {
     if (response.ok) {
       const result = await response.json()
       console.log("✅ Кейс открыт:", result)
-      console.log("DEBUG: Сервер вернул выигрыш:", result.gift) // Добавлено
       showConnectionStatus("Кейс открыт!")
       return result
     } else {
@@ -645,7 +644,6 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     if (i === targetWinningIndex) {
       // Вставляем фактический выигрышный приз в целевую позицию
       rewardValue = winningGiftCost
-      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`) // Добавлено
     } else {
       const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
       rewardValue = randomReward.cost
@@ -766,9 +764,18 @@ async function spinPrizes() {
     console.log("DEBUG: extraFullSpins * viewportWidth:", extraFullSpins * viewportWidth)
     console.log("DEBUG: totalScrollDistance (calculated):", totalScrollDistance)
 
+    prizeScroll.style.transition = "none"
     // === НАЧАЛО ИЗМЕНЕНИЙ ДЛЯ WAAPI ===
     // Сбрасываем transform перед началом новой анимации
     prizeScroll.style.transform = "translateX(0px)"
+    prizeScroll.offsetHeight // Принудительная перерисовка
+
+    prizeScroll.style.transition = "transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)"
+    prizeScroll.style.transform = `translateX(-${totalScrollDistance}px)`
+
+    // Ждем завершения основной анимации
+    await new Promise((resolve) => setTimeout(resolve, 5000))
+    console.log("DEBUG: Основная анимация завершена.")
     prizeScroll.offsetHeight // Принудительная перерисовка для применения сброса
 
     const animation = prizeScroll.animate(
@@ -793,15 +800,15 @@ async function spinPrizes() {
       winningElement.classList.add("winning-prize")
       console.log("DEBUG: Визуально выделенный приз (из DOM):", winningElement.textContent)
       console.log("DEBUG: Ожидаемый выигрышный приз (из API):", result.gift)
-      console.log(
-        `DEBUG: Сравнение: Выигрыш от сервера: ${result.gift}, Текст элемента: ${Number.parseInt(winningElement.textContent)}`,
-      ) // Добавлено для прямого сравнения
+      showNotification(`🎉 Вы выиграли ${result.gift} 💎!`, "success", 3000) // Добавлено уведомление
       showNotification(`🎉 Вы выиграли ${result.gift} 💎!`, "success", 3000)
     }
 
     // === НАЧАЛО ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ (SNAP CORRECTION) ===
     // С WAAPI потребность в подгонке может быть меньше, но оставим ее для максимальной точности
     try {
+      const currentTransform = window.getComputedStyle(prizeScroll).transform
+      let currentScrollX = 0
       const winningElementRect = winningElement.getBoundingClientRect()
       const viewportRect = viewport.getBoundingClientRect()
 
@@ -815,9 +822,12 @@ async function spinPrizes() {
       // Calculate the desired center of the viewport relative to its left edge
       const desiredViewportCenter = viewportRect.width / 2
 
+      console.log("DEBUG: Raw transform style for snap correction:", currentTransform) // Добавлено для отладки
       // Calculate the offset needed to bring the winning element's center to the viewport's center
       const offsetToCenter = currentWinningElementCenterInViewport - desiredViewportCenter
 
+      // Пробуем распарсить matrix()
+      const matrixMatch = currentTransform.match(
       // Get the current transform value directly from the element's style (set by WAAPI)
       // WAAPI sets the final transform directly on style, so getComputedStyle might not be needed for this.
       // However, getComputedStyle is safer for cross-browser consistency if WAAPI doesn't always set style.transform immediately.
@@ -830,14 +840,24 @@ async function spinPrizes() {
         /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/,
       )
       if (matrixMatch && matrixMatch.length >= 6) {
+        // translateX значение находится на 5-й позиции (индекс 5 в массиве match)
+        currentScrollX = Math.abs(Number.parseFloat(matrixMatch[5]))
+        console.log("DEBUG: Parsed from matrix:", currentScrollX)
         currentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
         console.log("DEBUG: Parsed from matrix (currentTranslateX):", currentTranslateX)
       } else {
+        // Если не matrix, пробуем распарсить translateX()
+        const translateXMatch = currentTransform.match(/translateX$$(-?\d+\.?\d*)px$$/)
         const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
         if (translateXMatch && translateXMatch[1]) {
+          currentScrollX = Math.abs(Number.parseFloat(translateXMatch[1]))
+          console.log("DEBUG: Parsed from translateX:", currentScrollX)
           currentTranslateX = Number.parseFloat(translateXMatch[1])
           console.log("DEBUG: Parsed from translateX (currentTranslateX):", currentTranslateX)
         } else {
+          console.warn("WARNING: Could not parse transform style, unexpected format:", currentTransform)
+          // Fallback to 0 if parsing fails to prevent TypeError
+          currentScrollX = 0
           console.warn(
             "WARNING: Could not parse transform style for snap correction, unexpected format:",
             currentTransformStyle,
@@ -846,18 +866,30 @@ async function spinPrizes() {
         }
       }
 
+      const actualWinningElementOffsetLeft = winningElement.offsetLeft
+      const targetLeftInViewport = (viewportWidth - winningElement.offsetWidth) / 2
+      const finalAdjustment = actualWinningElementOffsetLeft - currentScrollX - targetLeftInViewport
       // The new translateX value should be the current one minus the offset needed to center
       const newTranslateX = currentTranslateX - offsetToCenter
 
+      console.log("DEBUG: Current scroll X (from transform):", currentScrollX)
+      console.log("DEBUG: Actual winning element offsetLeft:", actualWinningElementOffsetLeft)
+      console.log("DEBUG: Target left in viewport:", targetLeftInViewport)
+      console.log("DEBUG: Final adjustment needed:", finalAdjustment)
       console.log("DEBUG: currentWinningElementCenterInViewport:", currentWinningElementCenterInViewport)
       console.log("DEBUG: desiredViewportCenter:", desiredViewportCenter)
       console.log("DEBUG: offsetToCenter (how much winning element is off center):", offsetToCenter)
       console.log("DEBUG: currentTranslateX (from prizeScroll style):", currentTranslateX)
       console.log("DEBUG: newTranslateX (calculated for snap):", newTranslateX)
 
+      if (Math.abs(finalAdjustment) > 0.5) {
+        // Применяем коррекцию, если она значительна
       if (Math.abs(offsetToCenter) > 0.5) {
         // Apply correction if offset is significant (e.g., more than 0.5px)
         prizeScroll.style.transition = "transform 0.1s ease-out"
+        prizeScroll.style.transform = `translateX(-${totalScrollDistance + finalAdjustment}px)`
+        console.log("DEBUG: Applied snap adjustment.")
+        await new Promise((resolve) => setTimeout(resolve, 100)) // Ждем завершения коррекции
         prizeScroll.style.transform = `translateX(${newTranslateX}px)`
         console.log("DEBUG: Applied snap adjustment to:", newTranslateX)
         await new Promise((resolve) => setTimeout(resolve, 100)) // Wait for correction to finish
@@ -944,10 +976,10 @@ async function spinPrizes() {
     if (winningElement) {
       winningElement.classList.remove("winning-prize")
     }
+    prizeScroll.style.transition = "none"
+    prizeScroll.style.transform = "translateX(0px)"
     // Сбрасываем transform только если он не был установлен WAAPI (fill: 'forwards' уже делает это)
     // prizeScroll.style.transform = "translateX(0px)" // WAAPI с fill: 'forwards' уже держит конечное состояние
-    // WAAPI с fill: 'forwards' уже держит конечное состояние, поэтому явный сброс transform не нужен
-    // prizeScroll.style.transform = "translateX(0px)"
     // Перегенерируем для следующего спина, чтобы лента была "свежей"
     renderPrizeScroll(currentCase, 0)
 
