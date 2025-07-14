@@ -418,8 +418,6 @@ async function addFantics(amount) {
       return false
     }
   } catch (error) {
-    console.error("❌ Ошибка пополнения:", error)
-    showConnectionStatus("Ошибка пополнения", true)
     showNotification(`❌ ${error.message}`, "error")
     return false
   }
@@ -815,48 +813,38 @@ async function spinPrizes() {
 
     // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
     const gapValue = 16 // Tailwind's gap-4 is 16px
-
-    // Корректный расчет эффективной ширины элемента, включая gap
     const effectiveItemWidth = itemWidth + gapValue
     console.log("DEBUG: Effective item width (calculated):", effectiveItemWidth)
 
-    const winningElementCenterPosition = winningElement.offsetLeft + itemWidth / 2
-    const desiredScrollPosition = winningElementCenterPosition - viewportWidth / 2
+    // Calculate the final desired translateX to center the winning element
+    // This is the exact translateX value needed for the winning prize to be centered.
+    const finalCenteredTranslateX = -(winningElement.offsetLeft + itemWidth / 2 - viewportWidth / 2)
+    console.log("DEBUG: finalCenteredTranslateX (desired end position):", finalCenteredTranslateX)
 
-    const extraFullSpins = 5
-    // totalScrollDistance теперь использует корректный effectiveItemWidth
-    const totalScrollDistance =
-      desiredScrollPosition + extraFullSpins * prizeScroll.children.length * effectiveItemWidth
+    // Calculate the total distance for "spinning" effect
+    // This is a positive value representing how much extra distance we want to scroll.
+    const extraFullSpins = 5 // Still 5 full rotations
+    const spinDistance = extraFullSpins * prizeScroll.children.length * effectiveItemWidth
+    console.log("DEBUG: spinDistance (extra for animation):", spinDistance)
 
-    console.log("DEBUG: winningElement.offsetLeft:", winningElement.offsetLeft)
-    console.log("DEBUG: winningElement.offsetWidth (layout width):", winningElement.offsetWidth) // Оставляем для сравнения
-    console.log(
-      "DEBUG: winningElement.getBoundingClientRect().width (rendered width):",
-      winningElement.getBoundingClientRect().width,
-    ) // Добавлено для отладки
-    console.log("DEBUG: winningElementCenterPosition:", winningElementCenterPosition)
-    console.log("DEBUG: viewportWidth:", viewportWidth)
-    console.log("DEBUG: desiredScrollPosition:", desiredScrollPosition)
-    console.log(
-      "DEBUG: extraFullSpins * prizeScroll.children.length * effectiveItemWidth:",
-      extraFullSpins * prizeScroll.children.length * effectiveItemWidth,
-    )
-    console.log("DEBUG: totalScrollDistance (calculated):", totalScrollDistance)
+    // The animation's target translateX will be the finalCenteredTranslateX MINUS the spinDistance.
+    // This makes the animation go further left than the final snap point, creating the spin.
+    const animationTargetTranslateX = finalCenteredTranslateX - spinDistance
+    console.log("DEBUG: animationTargetTranslateX (animation's final point):", animationTargetTranslateX)
 
-    // === НАЧАЛО ИЗМЕНЕНИЙ ДЛЯ WAAPI ===
-    // Сбрасываем transform перед началом новой анимации
-    prizeScroll.style.transform = "translateX(0px)"
-    prizeScroll.offsetHeight // Принудительная перерисовка для применения сброса
+    // Reset transform before animation
+    prizeScroll.style.transform = "translateX(0px)" // Always start from 0
+    prizeScroll.offsetHeight // Force reflow
 
     animation = prizeScroll.animate(
       [
-        { transform: "translateX(0px)" }, // Начальное состояние
-        { transform: `translateX(-${totalScrollDistance}px)` }, // Конечное состояние
+        { transform: "translateX(0px)" }, // Start from current position (0)
+        { transform: `translateX(${animationTargetTranslateX}px)` }, // Animate to this far left point
       ],
       {
-        duration: 15000, // УВЕЛИЧЕНА ДЛИТЕЛЬНОСТЬ ДО 15 СЕКУНД
-        easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Та же кривая ускорения
-        fill: "forwards", // Сохранить конечное состояние после завершения
+        duration: 20000, // УВЕЛИЧЕНА ДЛИТЕЛЬНОСТЬ ДО 20 СЕКУНД
+        easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Smooth deceleration
+        fill: "forwards",
       },
     )
 
@@ -876,8 +864,8 @@ async function spinPrizes() {
 
         // Получаем текущий прогресс анимации
         const animationProgress = animation.currentTime / animation.effect.getComputedTiming().duration
-        // Вычисляем текущий translateX на основе прогресса и totalScrollDistance
-        const currentTranslateX = animationProgress * -totalScrollDistance
+        // Вычисляем текущий translateX на основе прогресса и animationTargetTranslateX
+        const currentTranslateX = animationProgress * animationTargetTranslateX
 
         const winningElementRect = winningElement.getBoundingClientRect()
         const viewportRect = viewport.getBoundingClientRect()
@@ -921,15 +909,8 @@ async function spinPrizes() {
       const viewport = prizeScroll.parentElement
       const viewportWidth = viewport.offsetWidth
 
-      // Вычисляем точное желаемое значение translateX для центрирования выигрышного элемента
-      // Это отрицательное значение расстояния от левого края prizeScroll до желаемой центральной точки.
-      // Желаемая центральная точка: (winningElement.offsetLeft + winningElement.offsetWidth / 2)
-      // минус половина ширины viewport, чтобы выровнять ее по центру viewport.
-      const desiredTranslateXForCentering = -(
-        winningElement.offsetLeft +
-        winningElement.getBoundingClientRect().width / 2 - // Используем getBoundingClientRect().width
-        viewportWidth / 2
-      )
+      // desiredTranslateXForCentering уже равен finalCenteredTranslateX
+      const desiredTranslateXForCentering = finalCenteredTranslateX
 
       const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
       let actualCurrentTranslateX = 0
@@ -961,8 +942,8 @@ async function spinPrizes() {
             "WARNING: Snap Correction - Could not parse transform style, unexpected format:",
             currentTransformStyle,
           )
-          // In case of parsing failure, use the assumed final position
-          actualCurrentTranslateX = -totalScrollDistance
+          // In case of parsing failure, use the assumed final position from animation
+          actualCurrentTranslateX = animationTargetTranslateX
         }
       }
 
