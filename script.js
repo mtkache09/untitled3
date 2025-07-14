@@ -710,6 +710,10 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     prizeElement.className = `flex-shrink-0 w-20 h-20 ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20`
     prizeElement.textContent = `${rewardValue} 💎`
     prizeScroll.appendChild(prizeElement)
+    // Добавляем лог для проверки вычисленной ширины элемента сразу после добавления в DOM
+    console.log(
+      `DEBUG: Rendered prize element width for ${rewardValue} 💎 (at index ${i}): ${prizeElement.offsetWidth}px (offsetWidth), ${prizeElement.getBoundingClientRect().width}px (getBoundingClientRect().width)`,
+    )
   }
   // Добавляем лог для проверки вычисленной ширины элемента
   if (prizeScroll.firstElementChild) {
@@ -800,22 +804,19 @@ async function spinPrizes() {
     const viewport = prizeScroll.parentElement
     const viewportWidth = viewport.offsetWidth
 
-    // Динамически получаем itemWidth из первого элемента приза
-    // ИСПОЛЬЗУЕМ getBoundingClientRect().width для получения фактической отрисованной ширины
-    let itemWidth = 80 // Fallback
-    if (prizeScroll.firstElementChild) {
-      itemWidth = prizeScroll.firstElementChild.getBoundingClientRect().width
-      console.log("DEBUG: Dynamically measured itemWidth (from getBoundingClientRect):", itemWidth)
-    } else {
-      console.warn("WARNING: Could not measure prize element width, using hardcoded 80px.")
+    // Динамически получаем itemWidth из выигрышного элемента
+    let itemWidth = winningElement.getBoundingClientRect().width
+    if (itemWidth === 0) {
+      itemWidth = 80 // Fallback to expected Tailwind width if 0
+      console.warn("WARNING: winningElement.getBoundingClientRect().width returned 0, using hardcoded 80px.")
     }
+    console.log("DEBUG: Dynamically measured itemWidth (from winningElement.getBoundingClientRect()):", itemWidth)
 
     // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
     const gapValue = 16 // Tailwind's gap-4 is 16px
 
     // Корректный расчет эффективной ширины элемента, включая gap
     const effectiveItemWidth = itemWidth + gapValue
-
     console.log("DEBUG: Effective item width (calculated):", effectiveItemWidth)
 
     const winningElementCenterPosition = winningElement.offsetLeft + itemWidth / 2
@@ -933,6 +934,11 @@ async function spinPrizes() {
       let actualCurrentTranslateX = 0
 
       console.log("DEBUG: Snap Correction - Raw transform style:", currentTransformStyle)
+      console.log(
+        "DEBUG: Snap Correction - winningElement.getBoundingClientRect().width (at snap):",
+        winningElement.getBoundingClientRect().width,
+      )
+      console.log("DEBUG: Snap Correction - winningElement.offsetWidth (at snap):", winningElement.offsetWidth)
 
       // Corrected regex for matrix parsing: using escaped parentheses
       const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
@@ -961,11 +967,6 @@ async function spinPrizes() {
       const adjustmentNeeded = desiredTranslateXForCentering - actualCurrentTranslateX
 
       console.log("DEBUG: Snap Correction - winningElement.offsetLeft:", winningElement.offsetLeft)
-      console.log("DEBUG: Snap Correction - winningElement.offsetWidth (layout width):", winningElement.offsetWidth) // Оставляем для сравнения
-      console.log(
-        "DEBUG: Snap Correction - winningElement.getBoundingClientRect().width (rendered width):",
-        winningElement.getBoundingClientRect().width,
-      ) // Добавлено для отладки
       console.log("DEBUG: Snap Correction - viewportWidth:", viewportWidth)
       console.log("DEBUG: Snap Correction - desiredTranslateXForCentering:", desiredTranslateXForCentering)
       console.log("DEBUG: Snap Correction - actualCurrentTranslateX (from style):", actualCurrentTranslateX)
@@ -973,13 +974,13 @@ async function spinPrizes() {
 
       // Применяем коррекцию, если отклонение значительное (например, более 0.5px)
       if (Math.abs(adjustmentNeeded) > 0.5) {
-        prizeScroll.style.transition = "transform 0.1s ease-out" // Плавный переход для подгонки
+        prizeScroll.style.transition = "transform 0.3s ease-out" // Плавный переход для подгонки
         prizeScroll.style.transform = `translateX(${desiredTranslateXForCentering}px)`
         console.log(
           "DEBUG: Snap Correction - Applied adjustment to exact desired position:",
           desiredTranslateXForCentering,
         )
-        await new Promise((resolve) => setTimeout(resolve, 100)) // Ждем завершения коррекции
+        await new Promise((resolve) => setTimeout(resolve, 300)) // Ждем завершения коррекции
       } else {
         console.log("DEBUG: Snap Correction - adjustment not needed, offset is minimal:", adjustmentNeeded)
       }
