@@ -381,7 +381,6 @@ async function addFantics(amount) {
     const userId = getUserId()
     console.log("📡 Пополнение баланса:", amount, "для пользователя:", userId)
 
-    // Проверяем доступность авторизации для операций с деньгами
     if (!isAuthAvailable()) {
       throw new Error("Пополнение доступно только в Telegram WebApp")
     }
@@ -393,7 +392,6 @@ async function addFantics(amount) {
       headers: getAuthHeaders(),
       body: JSON.stringify({
         amount: amount,
-        // Убираем user_id - он должен браться из авторизации
       }),
       mode: "cors",
     })
@@ -405,15 +403,17 @@ async function addFantics(amount) {
       console.log("✅ Пополнение успешно:", result)
       showConnectionStatus("Баланс пополняется...")
 
-      // Определяем задержку в зависимости от режима (RabbitMQ или прямые транзакции)
       const delay = API_BASE.includes("localhost") ? 1000 : 3000
       setTimeout(() => {
         fetchUserFantics()
       }, delay)
       return true
     } else {
+      // Здесь добавляем подробный вывод ошибки
       const errorData = await response.json().catch(() => ({ detail: "Ошибка пополнения" }))
       console.error("❌ Ошибка пополнения:", response.status, errorData)
+      // Добавляем вывод детального содержания ошибки
+      console.error("❌ Ошибка пополнения - detail:", JSON.stringify(errorData.detail, null, 2))
       handleApiError(response, errorData)
       return false
     }
@@ -422,6 +422,7 @@ async function addFantics(amount) {
     return false
   }
 }
+
 
 function updateFanticsDisplay() {
   document.getElementById("userStars").textContent = userFantics.toLocaleString()
