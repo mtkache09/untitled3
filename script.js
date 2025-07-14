@@ -450,9 +450,8 @@ function renderCases() {
   const casesGrid = document.getElementById("casesGrid")
   casesGrid.innerHTML = ""
 
-  // TEMPORARY DEBUG: Add a bright background to casesGrid to see if it's there
-  casesGrid.style.backgroundColor = "rgba(255, 0, 0, 0.2)" // Semi-transparent red
-  console.log("DEBUG: casesGrid background set to red for visibility check.")
+  // REMOVED TEMPORARY DEBUG STYLE: casesGrid.style.backgroundColor = "rgba(255, 0, 0, 0.2)"
+  console.log("DEBUG: casesGrid background check removed.")
 
   if (cases.length === 0) {
     casesGrid.innerHTML = '<div class="col-span-2 text-center text-gray-400 py-8">Нет доступных кейсов</div>'
@@ -466,9 +465,11 @@ function renderCases() {
     const canAfford = userFantics >= caseItem.cost
 
     const caseElement = document.createElement("div")
-    // TEMPORARY DEBUG: Removed opacity-50 for testing visibility
+    // Corrected class for affordability:
     caseElement.className = `cursor-pointer transition-all duration-300 hover-scale bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-4 text-center ${
-      canAfford ? "hover:shadow-xl hover:shadow-purple-500/20 hover:border-purple-500/50" : "" // Removed opacity-50 for testing
+      canAfford
+        ? "hover:shadow-xl hover:shadow-purple-500/20 hover:border-purple-500/50"
+        : "opacity-50 cursor-not-allowed"
     }`
 
     const icons = {
@@ -803,8 +804,8 @@ async function spinPrizes() {
     const effectiveItemWidth = itemWidth + gapValue
 
     console.log("DEBUG: Measured itemWidth:", itemWidth)
-    console.log("DEBUG: Hardcoded gapValue:", gapValue) // Изменено
-    console.log("DEBUG: Effective item width (corrected):", effectiveItemWidth) // Изменено
+    console.log("DEBUG: Hardcoded gapValue:", gapValue)
+    console.log("DEBUG: Effective item width (corrected):", effectiveItemWidth)
 
     const winningElementCenterPosition = winningElement.offsetLeft + winningElement.offsetWidth / 2
     const desiredScrollPosition = winningElementCenterPosition - viewportWidth / 2
@@ -822,7 +823,7 @@ async function spinPrizes() {
     console.log(
       "DEBUG: extraFullSpins * prizeScroll.children.length * effectiveItemWidth:",
       extraFullSpins * prizeScroll.children.length * effectiveItemWidth,
-    ) // Изменено
+    )
     console.log("DEBUG: totalScrollDistance (calculated):", totalScrollDistance)
 
     // === НАЧАЛО ИЗМЕНЕНИЙ ДЛЯ WAAPI ===
@@ -831,7 +832,6 @@ async function spinPrizes() {
     prizeScroll.offsetHeight // Принудительная перерисовка для применения сброса
 
     animation = prizeScroll.animate(
-      // Присваиваем переменной animation
       [
         { transform: "translateX(0px)" }, // Начальное состояние
         { transform: `translateX(-${totalScrollDistance}px)` }, // Конечное состояние
@@ -917,15 +917,15 @@ async function spinPrizes() {
       const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
       let actualCurrentTranslateX = 0
 
-      console.log("DEBUG: Raw transform style for snap correction:", currentTransformStyle) // Added log
+      console.log("DEBUG: Raw transform style for snap correction:", currentTransformStyle)
 
       // Corrected regex for matrix parsing: escaped parentheses
       const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
       const matrixMatch = currentTransformStyle.match(matrixRegex)
 
       if (matrixMatch && matrixMatch.length >= 6) {
-        console.log("DEBUG: matrixMatch found:", matrixMatch) // Log the full match array
-        console.log("DEBUG: matrixMatch[5] (translateX):", matrixMatch[5]) // Log the captured translateX
+        console.log("DEBUG: matrixMatch found:", matrixMatch)
+        console.log("DEBUG: matrixMatch[5] (translateX):", matrixMatch[5])
         actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
       } else {
         // Corrected regex for translateX parsing: escaped parentheses
