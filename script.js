@@ -806,14 +806,7 @@ async function spinPrizes() {
     const viewportWidth = viewport.offsetWidth
 
     // ИСПРАВЛЕНО: Принудительно устанавливаем itemWidth в 80px
-    const firstPrizeElement = prizeScroll.querySelector(".prize-item");
-if (!firstPrizeElement) {
-  console.error("ERROR: Не найден элемент для определения ширины");
-  return; // или обработать ошибку иначе
-}
-const itemWidth = firstPrizeElement.getBoundingClientRect().width;
-console.log("DEBUG: Динамическая ширина элемента:", itemWidth);
-
+    const itemWidth = 80
     console.log("DEBUG: Hardcoded itemWidth for animation calculations:", itemWidth)
 
     // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
