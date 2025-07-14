@@ -815,7 +815,6 @@ async function spinPrizes() {
     // Корректный расчет эффективной ширины элемента, включая gap
     const effectiveItemWidth = itemWidth + gapValue
 
-    console.log("DEBUG: Hardcoded gapValue:", gapValue)
     console.log("DEBUG: Effective item width (calculated):", effectiveItemWidth)
 
     const winningElementCenterPosition = winningElement.offsetLeft + winningElement.offsetWidth / 2
