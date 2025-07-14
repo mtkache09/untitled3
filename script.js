@@ -444,12 +444,81 @@ function updateOpenButton() {
   }
 }
 
+function renderPrizeScroll(caseData, winningGiftCost) {
+  const prizeScroll = document.getElementById("prizeScroll")
+  prizeScroll.innerHTML = ""
+
+  const possibleRewards = caseData.possible_rewards
+
+  const numPrizes = 150 // Генерируем больше призов для длинной прокрутки
+  // Целевой индекс, куда будет помещен выигрышный приз.
+  // Выбираем его достаточно далеко от начала, чтобы было место для "разгона"
+  // и достаточно далеко от конца, чтобы было место для "торможения".
+  const targetWinningIndex = 75 + Math.floor(Math.random() * 10) // Например, между 75 и 84
+
+  console.log("DEBUG: renderPrizeScroll - Ожидаемый выигрышный приз (winningGiftCost):", winningGiftCost)
+  console.log(
+    "DEBUG: renderPrizeScroll - Целевой индекс выигрышного приза на ленте (targetWinningIndex):",
+    targetWinningIndex,
+  )
+
+  const lastTwoRewards = [null, null] // Для отслеживания последних двух призов
+
+  for (let i = 0; i < numPrizes; i++) {
+    const prizeElement = document.createElement("div")
+    let rewardValue
+
+    if (i === targetWinningIndex) {
+      // Вставляем фактический выигрышный приз в целевую позицию
+      rewardValue = winningGiftCost
+      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`)
+    } else {
+      let randomReward
+      let attempts = 0
+      do {
+        randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
+        rewardValue = randomReward.cost
+        attempts++
+        // Защита от бесконечного цикла, если нет других призов
+        if (attempts > 50 && possibleRewards.length > 1) {
+          console.warn("WARNING: Не удалось найти уникальный приз после 50 попыток. Возможно, мало вариантов призов.")
+          break
+        }
+      } while (lastTwoRewards[0] === rewardValue && lastTwoRewards[1] === rewardValue)
+    }
+
+    // Обновляем историю последних двух призов
+    lastTwoRewards[0] = lastTwoRewards[1]
+    lastTwoRewards[1] = rewardValue
+
+    let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
+    if (rewardValue >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
+    else if (rewardValue >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
+    else if (rewardValue >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
+    else if (rewardValue >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
+
+    // ПРИНУДИТЕЛЬНО УСТАНАВЛИВАЕМ ШИРИНУ И ВЫСОТУ ЧЕРЕЗ STYLE
+    prizeElement.className = `flex-shrink-0 w-20 h-20 min-w-[80px] max-w-[80px] ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20`
+    prizeElement.style.width = "80px" // Принудительная установка ширины
+    prizeElement.style.height = "80px" // Принудительная установка высоты
+    prizeElement.textContent = `${rewardValue} 💎`
+    prizeScroll.appendChild(prizeElement)
+    // Добавляем лог для проверки вычисленной ширины элемента сразу после добавления в DOM
+    console.log(
+      `DEBUG: Rendered prize element width for ${rewardValue} 💎 (at index ${i}): ${prizeElement.offsetWidth}px (offsetWidth), ${prizeElement.getBoundingClientRect().width}px (getBoundingClientRect().width)`,
+    )
+  }
+  // Добавляем лог для проверки вычисленной ширины элемента
+  if (prizeScroll.firstElementChild) {
+    const computedStyle = window.getComputedStyle(prizeScroll.firstElementChild)
+    console.log("DEBUG: Computed prize element width (from getComputedStyle):", computedStyle.width)
+  }
+  return targetWinningIndex // Возвращаем индекс, чтобы spinPrizes знал, куда целиться
+}
+
 function renderCases() {
   const casesGrid = document.getElementById("casesGrid")
   casesGrid.innerHTML = ""
-
-  // REMOVED TEMPORARY DEBUG STYLE: casesGrid.style.backgroundColor = "rgba(255, 0, 0, 0.2)"
-  console.log("DEBUG: casesGrid background check removed.")
 
   if (cases.length === 0) {
     casesGrid.innerHTML = '<div class="col-span-2 text-center text-gray-400 py-8">Нет доступных кейсов</div>'
@@ -463,7 +532,6 @@ function renderCases() {
     const canAfford = userFantics >= caseItem.cost
 
     const caseElement = document.createElement("div")
-    // Corrected class for affordability:
     caseElement.className = `cursor-pointer transition-all duration-300 hover-scale bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-4 text-center ${
       canAfford
         ? "hover:shadow-xl hover:shadow-purple-500/20 hover:border-purple-500/50"
@@ -502,6 +570,28 @@ function renderCases() {
     console.log(`DEBUG: Appended case: ${caseItem.name}`)
   })
   console.log(`DEBUG: Total children in casesGrid after rendering: ${casesGrid.children.length}`)
+}
+
+function renderPossiblePrizes(caseData) {
+  const possiblePrizes = document.getElementById("possiblePrizes")
+  possiblePrizes.innerHTML = ""
+
+  caseData.possible_rewards.forEach((reward) => {
+    const prizeElement = document.createElement("div")
+
+    let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
+    if (reward.cost >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
+    else if (reward.cost >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
+    else if (reward.cost >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
+    else if (reward.cost >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
+
+    prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
+    prizeElement.innerHTML = `
+    <div class="font-bold">${reward.cost} 💎</div>
+    <div class="text-xs opacity-75">${reward.probability}%</div>
+`
+    possiblePrizes.appendChild(prizeElement)
+  })
 }
 
 function renderDepositAmounts() {
@@ -650,102 +740,6 @@ function openCasePage(caseData) {
   renderPossiblePrizes(caseData)
 }
 
-// renderPrizeScroll теперь принимает выигрышный приз для корректного размещения
-// и возвращает индекс, куда был помещен выигрышный приз
-function renderPrizeScroll(caseData, winningGiftCost) {
-  const prizeScroll = document.getElementById("prizeScroll")
-  prizeScroll.innerHTML = ""
-
-  const possibleRewards = caseData.possible_rewards
-
-  const numPrizes = 150 // Генерируем больше призов для длинной прокрутки
-  // Целевой индекс, куда будет помещен выигрышный приз.
-  // Выбираем его достаточно далеко от начала, чтобы было место для "разгона"
-  // и достаточно далеко от конца, чтобы было место для "торможения".
-  const targetWinningIndex = 75 + Math.floor(Math.random() * 10) // Например, между 75 и 84
-
-  console.log("DEBUG: renderPrizeScroll - Ожидаемый выигрышный приз (winningGiftCost):", winningGiftCost)
-  console.log(
-    "DEBUG: renderPrizeScroll - Целевой индекс выигрышного приза на ленте (targetWinningIndex):",
-    targetWinningIndex,
-  )
-
-  const lastTwoRewards = [null, null] // Для отслеживания последних двух призов
-
-  for (let i = 0; i < numPrizes; i++) {
-    const prizeElement = document.createElement("div")
-    let rewardValue
-
-    if (i === targetWinningIndex) {
-      // Вставляем фактический выигрышный приз в целевую позицию
-      rewardValue = winningGiftCost
-      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`)
-    } else {
-      let randomReward
-      let attempts = 0
-      do {
-        randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
-        rewardValue = randomReward.cost
-        attempts++
-        // Защита от бесконечного цикла, если нет других призов
-        if (attempts > 50 && possibleRewards.length > 1) {
-          console.warn("WARNING: Не удалось найти уникальный приз после 50 попыток. Возможно, мало вариантов призов.")
-          break
-        }
-      } while (lastTwoRewards[0] === rewardValue && lastTwoRewards[1] === rewardValue)
-    }
-
-    // Обновляем историю последних двух призов
-    lastTwoRewards[0] = lastTwoRewards[1]
-    lastTwoRewards[1] = rewardValue
-
-    let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
-    if (rewardValue >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
-    else if (rewardValue >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
-    else if (rewardValue >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
-    else if (rewardValue >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
-
-    // ПРИНУДИТЕЛЬНО УСТАНАВЛИВАЕМ ШИРИНУ И ВЫСОТУ ЧЕРЕЗ STYLE
-    prizeElement.className = `flex-shrink-0 w-20 h-20 min-w-[80px] max-w-[80px] ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20`
-    prizeElement.style.width = "80px" // Принудительная установка ширины
-    prizeElement.style.height = "80px" // Принудительная установка высоты
-    prizeElement.textContent = `${rewardValue} 💎`
-    prizeScroll.appendChild(prizeElement)
-    // Добавляем лог для проверки вычисленной ширины элемента сразу после добавления в DOM
-    console.log(
-      `DEBUG: Rendered prize element width for ${rewardValue} 💎 (at index ${i}): ${prizeElement.offsetWidth}px (offsetWidth), ${prizeElement.getBoundingClientRect().width}px (getBoundingClientRect().width)`,
-    )
-  }
-  // Добавляем лог для проверки вычисленной ширины элемента
-  if (prizeScroll.firstElementChild) {
-    const computedStyle = window.getComputedStyle(prizeScroll.firstElementChild)
-    console.log("DEBUG: Computed prize element width (from getComputedStyle):", computedStyle.width)
-  }
-  return targetWinningIndex // Возвращаем индекс, чтобы spinPrizes знал, куда целиться
-}
-
-function renderPossiblePrizes(caseData) {
-  const possiblePrizes = document.getElementById("possiblePrizes")
-  possiblePrizes.innerHTML = ""
-
-  caseData.possible_rewards.forEach((reward) => {
-    const prizeElement = document.createElement("div")
-
-    let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
-    if (reward.cost >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
-    else if (reward.cost >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
-    else if (reward.cost >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
-    else if (reward.cost >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
-
-    prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
-    prizeElement.innerHTML = `
-    <div class="font-bold">${reward.cost} 💎</div>
-    <div class="text-xs opacity-75">${reward.probability}%</div>
-`
-    possiblePrizes.appendChild(prizeElement)
-  })
-}
-
 async function spinPrizes() {
   if (isSpinning) return
 
@@ -846,7 +840,7 @@ async function spinPrizes() {
         { transform: `translateX(${animationTargetTranslateX}px)` }, // Animate to this far left point
       ],
       {
-        duration: 5000, // УМЕНЬШЕНА ДЛИТЕЛЬНОСТЬ ДО 5 СЕКУНД
+        duration: 10000, // УВЕЛИЧЕНА ДЛИТЕЛЬНОСТЬ ДО 10 СЕКУНД
         easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Smooth deceleration
         fill: "forwards",
       },
@@ -927,17 +921,18 @@ async function spinPrizes() {
       console.log("DEBUG: Snap Correction - winningElement.offsetWidth (at snap):", winningElement.offsetWidth)
       console.log("DEBUG: Snap Correction - prizeScroll.getBoundingClientRect():", prizeScroll.getBoundingClientRect())
 
-      // ИСПРАВЛЕНО: Corrected regex for matrix parsing: using \ (escaped parentheses)
+      // ИСПРАВЛЕНО: Corrected regex for matrix parsing: using escaped parentheses
       const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
       const matrixMatch = currentTransformStyle.match(matrixRegex)
 
-      if (matrixMatch && matrixMatch.length >= 6) {
+      if (matrixMatch && matrixMatch.length >= 7) {
+        // Changed to 7 as matrix has 6 capturing groups + full match
         // Should be 6 capturing groups for matrix(a,b,c,d,tx,ty)
         console.log("DEBUG: Snap Correction - matrixMatch found:", matrixMatch)
         console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5]) // tx is the 5th capturing group (index 5)
         actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
       } else {
-        // ИСПРАВЛЕНО: Corrected regex for translateX parsing: using \ (escaped parentheses)
+        // ИСПРАВЛЕНО: Corrected regex for translateX parsing: using escaped parentheses
         const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
         if (translateXMatch && translateXMatch[1]) {
           actualCurrentTranslateX = Number.parseFloat(translateXMatch[1])
