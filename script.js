@@ -711,6 +711,11 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     prizeElement.textContent = `${rewardValue} 💎`
     prizeScroll.appendChild(prizeElement)
   }
+  // Добавляем лог для проверки вычисленной ширины элемента
+  if (prizeScroll.firstElementChild) {
+    const computedStyle = window.getComputedStyle(prizeScroll.firstElementChild)
+    console.log("DEBUG: Computed prize element width:", computedStyle.width)
+  }
   return targetWinningIndex // Возвращаем индекс, чтобы spinPrizes знал, куда целиться
 }
 
