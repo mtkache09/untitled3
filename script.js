@@ -854,7 +854,7 @@ async function spinPrizes() {
         { transform: `translateX(-${totalScrollDistance}px)` }, // Конечное состояние
       ],
       {
-        duration: 10000, // Увеличена длительность до 10 секунд
+        duration: 15000, // УВЕЛИЧЕНА ДЛИТЕЛЬНОСТЬ ДО 15 СЕКУНД
         easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Та же кривая ускорения
         fill: "forwards", // Сохранить конечное состояние после завершения
       },
