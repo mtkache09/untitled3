@@ -822,9 +822,9 @@ async function spinPrizes() {
     console.log("DEBUG: finalCenteredTranslateX (desired end position):", finalCenteredTranslateX)
 
     // Calculate the total distance for "spinning" effect
-    // This is a positive value representing how much extra distance we want to scroll.
-    const extraFullSpins = 5 // Still 5 full rotations
-    const spinDistance = extraFullSpins * prizeScroll.children.length * effectiveItemWidth
+    // Уменьшаем количество "лишних" прокручиваемых элементов
+    const overshootItems = 30 // Прокручиваем на 30 элементов дальше, чем нужно, затем замедляемся
+    const spinDistance = overshootItems * effectiveItemWidth
     console.log("DEBUG: spinDistance (extra for animation):", spinDistance)
 
     // The animation's target translateX will be the finalCenteredTranslateX MINUS the spinDistance.
@@ -842,7 +842,7 @@ async function spinPrizes() {
         { transform: `translateX(${animationTargetTranslateX}px)` }, // Animate to this far left point
       ],
       {
-        duration: 20000, // УВЕЛИЧЕНА ДЛИТЕЛЬНОСТЬ ДО 20 СЕКУНД
+        duration: 5000, // УМЕНЬШЕНА ДЛИТЕЛЬНОСТЬ ДО 5 СЕКУНД
         easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Smooth deceleration
         fill: "forwards",
       },
