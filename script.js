@@ -450,9 +450,8 @@ function renderCases() {
   const casesGrid = document.getElementById("casesGrid")
   casesGrid.innerHTML = ""
 
-  // TEMPORARY DEBUG: Add a bright background to casesGrid to see if it's there
-  casesGrid.style.backgroundColor = "rgba(255, 0, 0, 0.2)" // Semi-transparent red
-  console.log("DEBUG: casesGrid background set to red for visibility check.")
+  // REMOVED TEMPORARY DEBUG STYLE: casesGrid.style.backgroundColor = "rgba(255, 0, 0, 0.2)"
+  console.log("DEBUG: casesGrid background check removed.")
 
   if (cases.length === 0) {
     casesGrid.innerHTML = '<div class="col-span-2 text-center text-gray-400 py-8">Нет доступных кейсов</div>'
@@ -466,9 +465,11 @@ function renderCases() {
     const canAfford = userFantics >= caseItem.cost
 
     const caseElement = document.createElement("div")
-    // TEMPORARY DEBUG: Removed opacity-50 for testing visibility
+    // Corrected class for affordability:
     caseElement.className = `cursor-pointer transition-all duration-300 hover-scale bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-4 text-center ${
-      canAfford ? "hover:shadow-xl hover:shadow-purple-500/20 hover:border-purple-500/50" : "" // Removed opacity-50 for testing
+      canAfford
+        ? "hover:shadow-xl hover:shadow-purple-500/20 hover:border-purple-500/50"
+        : "opacity-50 cursor-not-allowed"
     }`
 
     const icons = {
@@ -484,16 +485,16 @@ function renderCases() {
     }
 
     caseElement.innerHTML = `
-      <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
+    <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
         <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
-      </div>
-      <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
-      <div class="flex items-center justify-center gap-1">
+    </div>
+    <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
+    <div class="flex items-center justify-center gap-1">
         <span class="text-purple-400">💎</span>
         <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
-      </div>
-      ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
-    `
+    </div>
+    ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
+`
 
     if (canAfford) {
       caseElement.addEventListener("click", () => openCasePage(caseItem))
@@ -518,11 +519,11 @@ function renderDepositAmounts() {
     const totalAmount = item.amount + item.bonus
 
     amountElement.innerHTML = `
-      ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
-      <div class="text-white font-bold text-lg">${item.amount} 💎</div>
-      ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
-      ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
-    `
+    ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
+    <div class="text-white font-bold text-lg">${item.amount} 💎</div>
+    ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
+    ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
+`
 
     amountElement.addEventListener("click", (e) => selectDepositAmount(item, e))
     depositAmountsContainer.appendChild(amountElement)
@@ -728,9 +729,9 @@ function renderPossiblePrizes(caseData) {
 
     prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
     prizeElement.innerHTML = `
-      <div class="font-bold">${reward.cost} 💎</div>
-      <div class="text-xs opacity-75">${reward.probability}%</div>
-    `
+    <div class="font-bold">${reward.cost} 💎</div>
+    <div class="text-xs opacity-75">${reward.probability}%</div>
+`
     possiblePrizes.appendChild(prizeElement)
   })
 }
@@ -796,16 +797,15 @@ async function spinPrizes() {
 
     const firstItem = prizeScroll.children[0]
     const itemWidth = firstItem.offsetWidth
-    const computedStyle = window.getComputedStyle(firstItem)
-    const marginRight = Number.parseFloat(computedStyle.marginRight)
+    // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
     const gapValue = 16 // Tailwind's gap-4 is 16px
 
     // Корректный расчет эффективной ширины элемента, включая gap
     const effectiveItemWidth = itemWidth + gapValue
 
     console.log("DEBUG: Measured itemWidth:", itemWidth)
-    console.log("DEBUG: Hardcoded gapValue:", gapValue) // Изменено
-    console.log("DEBUG: Effective item width (corrected):", effectiveItemWidth) // Изменено
+    console.log("DEBUG: Hardcoded gapValue:", gapValue)
+    console.log("DEBUG: Effective item width (corrected):", effectiveItemWidth)
 
     const winningElementCenterPosition = winningElement.offsetLeft + winningElement.offsetWidth / 2
     const desiredScrollPosition = winningElementCenterPosition - viewportWidth / 2
@@ -815,19 +815,15 @@ async function spinPrizes() {
     const totalScrollDistance =
       desiredScrollPosition + extraFullSpins * prizeScroll.children.length * effectiveItemWidth
 
-    console.log("DEBUG: Measured itemWidth:", itemWidth)
-    console.log("DEBUG: Measured marginRight:", marginRight)
-    console.log("DEBUG: Effective item width:", effectiveItemWidth)
     console.log("DEBUG: winningElement.offsetLeft:", winningElement.offsetLeft)
     console.log("DEBUG: winningElement.offsetWidth:", winningElement.offsetWidth)
     console.log("DEBUG: winningElementCenterPosition:", winningElementCenterPosition)
     console.log("DEBUG: viewportWidth:", viewportWidth)
     console.log("DEBUG: desiredScrollPosition:", desiredScrollPosition)
-    console.log("DEBUG: extraFullSpins * viewportWidth:", extraFullSpins * viewportWidth)
     console.log(
       "DEBUG: extraFullSpins * prizeScroll.children.length * effectiveItemWidth:",
       extraFullSpins * prizeScroll.children.length * effectiveItemWidth,
-    ) // Изменено
+    )
     console.log("DEBUG: totalScrollDistance (calculated):", totalScrollDistance)
 
     // === НАЧАЛО ИЗМЕНЕНИЙ ДЛЯ WAAPI ===
@@ -836,13 +832,12 @@ async function spinPrizes() {
     prizeScroll.offsetHeight // Принудительная перерисовка для применения сброса
 
     animation = prizeScroll.animate(
-      // Присваиваем переменной animation
       [
         { transform: "translateX(0px)" }, // Начальное состояние
         { transform: `translateX(-${totalScrollDistance}px)` }, // Конечное состояние
       ],
       {
-        duration: 8000, // Увеличена длительность до 8 секунд
+        duration: 10000, // Увеличена длительность до 10 секунд
         easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Та же кривая ускорения
         fill: "forwards", // Сохранить конечное состояние после завершения
       },
@@ -922,16 +917,15 @@ async function spinPrizes() {
       const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
       let actualCurrentTranslateX = 0
 
-      console.log("DEBUG: Raw transform style for snap correction:", currentTransformStyle) // Added log
+      console.log("DEBUG: Raw transform style for snap correction:", currentTransformStyle)
 
       // Corrected regex for matrix parsing: escaped parentheses
-      const matrixRegex =
-        /matrix$$(-?\d+\.?\d*),\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$$/
+      const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
       const matrixMatch = currentTransformStyle.match(matrixRegex)
 
       if (matrixMatch && matrixMatch.length >= 6) {
-        console.log("DEBUG: matrixMatch found:", matrixMatch) // Log the full match array
-        console.log("DEBUG: matrixMatch[5] (translateX):", matrixMatch[5]) // Log the captured translateX
+        console.log("DEBUG: matrixMatch found:", matrixMatch)
+        console.log("DEBUG: matrixMatch[5] (translateX):", matrixMatch[5])
         actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
       } else {
         // Corrected regex for translateX parsing: escaped parentheses
