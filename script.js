@@ -714,7 +714,7 @@ function renderPrizeScroll(caseData, winningGiftCost) {
   // Добавляем лог для проверки вычисленной ширины элемента
   if (prizeScroll.firstElementChild) {
     const computedStyle = window.getComputedStyle(prizeScroll.firstElementChild)
-    console.log("DEBUG: Computed prize element width:", computedStyle.width)
+    console.log("DEBUG: Computed prize element width (from getComputedStyle):", computedStyle.width)
   }
   return targetWinningIndex // Возвращаем индекс, чтобы spinPrizes знал, куда целиться
 }
@@ -800,15 +800,21 @@ async function spinPrizes() {
     const viewport = prizeScroll.parentElement
     const viewportWidth = viewport.offsetWidth
 
-    // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ ШИРИНЫ ЭЛЕМЕНТА (w-20 = 80px)
-    const itemWidth = 80
+    // Динамически получаем itemWidth из первого элемента приза
+    let itemWidth = 80 // Fallback
+    if (prizeScroll.firstElementChild) {
+      itemWidth = prizeScroll.firstElementChild.offsetWidth
+      console.log("DEBUG: Dynamically measured itemWidth:", itemWidth)
+    } else {
+      console.warn("WARNING: Could not measure prize element width, using hardcoded 80px.")
+    }
+
     // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
     const gapValue = 16 // Tailwind's gap-4 is 16px
 
     // Корректный расчет эффективной ширины элемента, включая gap
     const effectiveItemWidth = itemWidth + gapValue
 
-    console.log("DEBUG: Hardcoded itemWidth (w-20):", itemWidth)
     console.log("DEBUG: Hardcoded gapValue:", gapValue)
     console.log("DEBUG: Effective item width (calculated):", effectiveItemWidth)
 
