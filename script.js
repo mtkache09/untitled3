@@ -801,10 +801,11 @@ async function spinPrizes() {
     const viewportWidth = viewport.offsetWidth
 
     // Динамически получаем itemWidth из первого элемента приза
+    // ИСПОЛЬЗУЕМ getBoundingClientRect().width для получения фактической отрисованной ширины
     let itemWidth = 80 // Fallback
     if (prizeScroll.firstElementChild) {
-      itemWidth = prizeScroll.firstElementChild.offsetWidth
-      console.log("DEBUG: Dynamically measured itemWidth:", itemWidth)
+      itemWidth = prizeScroll.firstElementChild.getBoundingClientRect().width
+      console.log("DEBUG: Dynamically measured itemWidth (from getBoundingClientRect):", itemWidth)
     } else {
       console.warn("WARNING: Could not measure prize element width, using hardcoded 80px.")
     }
@@ -817,7 +818,7 @@ async function spinPrizes() {
 
     console.log("DEBUG: Effective item width (calculated):", effectiveItemWidth)
 
-    const winningElementCenterPosition = winningElement.offsetLeft + winningElement.offsetWidth / 2
+    const winningElementCenterPosition = winningElement.offsetLeft + itemWidth / 2
     const desiredScrollPosition = winningElementCenterPosition - viewportWidth / 2
 
     const extraFullSpins = 5
@@ -826,7 +827,11 @@ async function spinPrizes() {
       desiredScrollPosition + extraFullSpins * prizeScroll.children.length * effectiveItemWidth
 
     console.log("DEBUG: winningElement.offsetLeft:", winningElement.offsetLeft)
-    console.log("DEBUG: winningElement.offsetWidth:", winningElement.offsetWidth)
+    console.log("DEBUG: winningElement.offsetWidth (layout width):", winningElement.offsetWidth) // Оставляем для сравнения
+    console.log(
+      "DEBUG: winningElement.getBoundingClientRect().width (rendered width):",
+      winningElement.getBoundingClientRect().width,
+    ) // Добавлено для отладки
     console.log("DEBUG: winningElementCenterPosition:", winningElementCenterPosition)
     console.log("DEBUG: viewportWidth:", viewportWidth)
     console.log("DEBUG: desiredScrollPosition:", desiredScrollPosition)
@@ -920,7 +925,7 @@ async function spinPrizes() {
       // минус половина ширины viewport, чтобы выровнять ее по центру viewport.
       const desiredTranslateXForCentering = -(
         winningElement.offsetLeft +
-        winningElement.offsetWidth / 2 -
+        winningElement.getBoundingClientRect().width / 2 - // Используем getBoundingClientRect().width
         viewportWidth / 2
       )
 
@@ -956,7 +961,11 @@ async function spinPrizes() {
       const adjustmentNeeded = desiredTranslateXForCentering - actualCurrentTranslateX
 
       console.log("DEBUG: Snap Correction - winningElement.offsetLeft:", winningElement.offsetLeft)
-      console.log("DEBUG: Snap Correction - winningElement.offsetWidth:", winningElement.offsetWidth)
+      console.log("DEBUG: Snap Correction - winningElement.offsetWidth (layout width):", winningElement.offsetWidth) // Оставляем для сравнения
+      console.log(
+        "DEBUG: Snap Correction - winningElement.getBoundingClientRect().width (rendered width):",
+        winningElement.getBoundingClientRect().width,
+      ) // Добавлено для отладки
       console.log("DEBUG: Snap Correction - viewportWidth:", viewportWidth)
       console.log("DEBUG: Snap Correction - desiredTranslateXForCentering:", desiredTranslateXForCentering)
       console.log("DEBUG: Snap Correction - actualCurrentTranslateX (from style):", actualCurrentTranslateX)
