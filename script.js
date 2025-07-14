@@ -360,7 +360,7 @@ async function openCaseAPI(caseId) {
     if (response.ok) {
       const result = await response.json()
       console.log("✅ Кейс открыт:", result)
-      console.log("DEBUG: Сервер вернул выигрыш:", result.gift) // Добавлено
+      console.log("DEBUG: Фактический выигрыш от сервера (result.gift):", result.gift) // Добавлено
       showConnectionStatus("Кейс открыт!")
       return result
     } else {
@@ -799,6 +799,12 @@ async function spinPrizes() {
       console.error("ERROR: Winning element not found at target index:", targetWinningIndex)
       throw new Error("Winning element not found.")
     }
+    console.log(
+      "DEBUG: Winning element identified (before animation):",
+      winningElement.textContent,
+      "at index",
+      targetWinningIndex,
+    )
 
     const viewport = prizeScroll.parentElement
     const viewportWidth = viewport.offsetWidth
@@ -891,7 +897,7 @@ async function spinPrizes() {
     // Ждем точного завершения анимации
     await animation.finished
     console.log("DEBUG: Основная анимация завершена (WAAPI).")
-    // === КОНЕЦ ИЗМЕНЕНИЙ ДЛЯ WAAPI ===
+    console.log("DEBUG: Element at final centered position (after animation):", winningElement.textContent)
 
     // Подсвечиваем выигрышный элемент
     if (winningElement) {
@@ -968,6 +974,7 @@ async function spinPrizes() {
       } else {
         console.log("DEBUG: Snap Correction - adjustment not needed, offset is minimal:", adjustmentNeeded)
       }
+      console.log("DEBUG: Element at final snapped position (after correction):", winningElement.textContent)
     } catch (snapError) {
       console.error("ERROR: Ошибка в логике подгонки (snap correction):", snapError)
       showNotification("⚠️ Ошибка анимации. Попробуйте еще раз.", "error")
