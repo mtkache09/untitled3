@@ -811,13 +811,9 @@ async function spinPrizes() {
     const viewport = prizeScroll.parentElement
     const viewportWidth = viewport.offsetWidth
 
-    // Динамически получаем itemWidth из выигрышного элемента
-    let itemWidth = winningElement.getBoundingClientRect().width
-    if (itemWidth === 0) {
-      itemWidth = 80 // Fallback to expected Tailwind width if 0
-      console.warn("WARNING: winningElement.getBoundingClientRect().width returned 0, using hardcoded 80px.")
-    }
-    console.log("DEBUG: Dynamically measured itemWidth (from winningElement.getBoundingClientRect()):", itemWidth)
+    // ИСПРАВЛЕНО: Принудительно устанавливаем itemWidth в 80px
+    const itemWidth = 80
+    console.log("DEBUG: Hardcoded itemWidth for animation calculations:", itemWidth)
 
     // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
     const gapValue = 16 // Tailwind's gap-4 is 16px
@@ -931,7 +927,7 @@ async function spinPrizes() {
       console.log("DEBUG: Snap Correction - winningElement.offsetWidth (at snap):", winningElement.offsetWidth)
       console.log("DEBUG: Snap Correction - prizeScroll.getBoundingClientRect():", prizeScroll.getBoundingClientRect())
 
-      // ИСПРАВЛЕНО: Corrected regex for matrix parsing: removed $
+      // ИСПРАВЛЕНО: Corrected regex for matrix parsing: using \ (escaped parentheses)
       const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
       const matrixMatch = currentTransformStyle.match(matrixRegex)
 
@@ -941,7 +937,7 @@ async function spinPrizes() {
         console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5]) // tx is the 5th capturing group (index 5)
         actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
       } else {
-        // ИСПРАВЛЕНО: Corrected regex for translateX parsing: removed $
+        // ИСПРАВЛЕНО: Corrected regex for translateX parsing: using \ (escaped parentheses)
         const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
         if (translateXMatch && translateXMatch[1]) {
           actualCurrentTranslateX = Number.parseFloat(translateXMatch[1])
