@@ -138,7 +138,7 @@ const depositAmounts = [
 
 // Функция для показа красивых уведомлений вместо alert
 function showNotification(message, type = "info", duration = 3000) {
-  // Удаляем предыдущие уведомления
+  // Удал��ем предыдущие уведомления
   const existingNotifications = document.querySelectorAll(".notification")
   existingNotifications.forEach((notification) => {
     notification.remove()
@@ -1080,7 +1080,7 @@ async function spinPrizes() {
 // --- NEW: TON Connect Integration ---
 // Initialize TonConnect
 const connector = new TonConnect({
-  manifestUrl: "https://mtkache09.github.io/untitled3/manifest.json, // !!! IMPORTANT: Replace with your dApp's actual manifest URL !!!
+  manifestUrl: "https://mtkache09.github.io/telegram-stars-case/manifest.json", // !!! IMPORTANT: Replace with your dApp's actual manifest URL !!!
   // For persistent connections, you might want to use a storage:
   // storage: new TonConnectSDK.LocalStorage(),
 })
