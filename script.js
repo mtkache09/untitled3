@@ -453,11 +453,11 @@ function renderPrizeScroll(caseData, winningGiftCost) {
 
   const possibleRewards = caseData.possible_rewards
 
-  const numPrizes = 150 // Генерируем больше призов для длинной прокрутки
+ 
   // Целевой индекс, куда будет помещен выигрышный приз.
   // Выбираем его достаточно далеко от начала, чтобы было место для "разгона"
   // и достаточно далеко от конца, чтобы было место для "торможения".
-  const targetWinningIndex = 75 + Math.floor(Math.random() * 10) // Например, между 75 и 84
+ 
   const numPrizes = 150 // Генерируем 150 призов для длинной ленты
   const targetWinningIndex = 149 // Жёстко фиксируем индекс выигрышного приза
 
