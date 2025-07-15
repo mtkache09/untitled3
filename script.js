@@ -459,7 +459,7 @@ function renderPrizeScroll(caseData, winningGiftCost) {
   // и достаточно далеко от конца, чтобы было место для "торможения".
  
   const numPrizes = 150 // Генерируем 150 призов для длинной ленты
-  const targetWinningIndex = 149 // Жёстко фиксируем индекс выигрышного приза
+  const targetWinningIndex = 55// Жёстко фиксируем индекс выигрышного приза
 
   console.log("DEBUG: renderPrizeScroll - Ожидаемый выигрышный приз (winningGiftCost):", winningGiftCost)
   console.log(
