@@ -1080,7 +1080,7 @@ async function spinPrizes() {
 // --- NEW: TON Connect Integration ---
 // Initialize TonConnect
 const connector = new TonConnect({
-  manifestUrl: "https://raw.githubusercontent.com/ton-community/ton-connect-manifests/main/dapps/my-dapp.json", // !!! IMPORTANT: Replace with your dApp's actual manifest URL !!!
+  manifestUrl: "https://mtkache09.github.io/untitled3/manifest.json, // !!! IMPORTANT: Replace with your dApp's actual manifest URL !!!
   // For persistent connections, you might want to use a storage:
   // storage: new TonConnectSDK.LocalStorage(),
 })
