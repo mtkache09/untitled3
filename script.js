@@ -793,6 +793,10 @@ async function spinPrizes() {
       console.log("DEBUG: Баланс после списания стоимости кейса (Демо):", userFantics)
       console.log("DEBUG: Симулированный выигрыш (Демо):", result.gift)
     }
+    // СБРОС трансформации перед анимацией (ГАРАНТИРОВАННЫЙ)
+prizeScroll.style.transition = "none"
+prizeScroll.style.transform = "translateX(0px)"
+await new Promise(resolve => requestAnimationFrame(resolve)) // дождаться кадра
 
     // Теперь, когда мы знаем выигрышный приз, генерируем ленту
     const targetWinningIndex = renderPrizeScroll(currentCase, result.gift)
