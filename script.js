@@ -925,29 +925,29 @@ async function spinPrizes() {
       console.log("DEBUG: Snap Correction - prizeScroll.getBoundingClientRect():", prizeScroll.getBoundingClientRect())
 
       // ИСПРАВЛЕНО: Corrected regex for matrix parsing: using escaped parentheses
-      const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
-      const matrixMatch = currentTransformStyle.match(matrixRegex)
+   const matrixRegex = /matrix\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*(-?\d+\.?\d*),\s*([^)]+)\)/;
+const matrixMatch = currentTransformStyle.match(matrixRegex);
 
-      if (matrixMatch && matrixMatch.length >= 7) {
-        // Changed to 7 as matrix has 6 capturing groups + full match
-        // Should be 6 capturing groups for matrix(a,b,c,d,tx,ty)
-        console.log("DEBUG: Snap Correction - matrixMatch found:", matrixMatch)
-        console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5]) // tx is the 5th capturing group (index 5)
-        actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
-      } else {
-        // ИСПРАВЛЕНО: Corrected regex for translateX parsing: using escaped parentheses
-        const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
-        if (translateXMatch && translateXMatch[1]) {
-          actualCurrentTranslateX = Number.parseFloat(translateXMatch[1])
-        } else {
-          console.warn(
-            "WARNING: Snap Correction - Could not parse transform style, unexpected format:",
-            currentTransformStyle,
-          )
-          // In case of parsing failure, use the assumed final position from animation
-          actualCurrentTranslateX = animationTargetTranslateX
-        }
-      }
+if (matrixMatch && matrixMatch.length >= 7) {
+  // matrixMatch[5] — это translateX (tx)
+  console.log("DEBUG: Snap Correction - matrixMatch found:", matrixMatch);
+  console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5]);
+  actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]);
+} else {
+  const translateXMatch = currentTransformStyle.match(/translateX\((-?\d+\.?\d*)px\)/);
+  if (translateXMatch && translateXMatch[1]) {
+    actualCurrentTranslateX = Number.parseFloat(translateXMatch[1]);
+  } else {
+    console.warn(
+      "WARNING: Snap Correction - Could not parse transform style, unexpected format:",
+      currentTransformStyle,
+    );
+    // В случае ошибки парсинга берём значение из анимации
+    actualCurrentTranslateX = animationTargetTranslateX;
+  }
+}
+
+
 
       // Вычисляем разницу между фактическим текущим положением и желаемым центрированным положением
       const adjustmentNeeded = desiredTranslateXForCentering - actualCurrentTranslateX
