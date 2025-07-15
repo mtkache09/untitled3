@@ -387,17 +387,14 @@ async function addFantics(amount) {
 
     showConnectionStatus("Пополнение баланса...")
 
-    
-   const response = await fetch(`${API_BASE}/fantics/add`, {
-  method: "POST",
-  headers: getAuthHeaders(),
-  body: JSON.stringify({
-    user_id: getUserId(),  // <- добавить сюда user_id
-    amount: amount,
-  }),
-  mode: "cors",
-});
-
+    const response = await fetch(`${API_BASE}/fantics/add`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        amount: amount,
+      }),
+      mode: "cors",
+    })
 
     console.log("📡 Ответ сервера (пополнение):", response.status)
 
@@ -425,7 +422,6 @@ async function addFantics(amount) {
     return false
   }
 }
-
 
 function updateFanticsDisplay() {
   document.getElementById("userStars").textContent = userFantics.toLocaleString()
@@ -458,10 +454,7 @@ function renderPrizeScroll(caseData, winningGiftCost) {
   // Целевой индекс, куда будет помещен выигрышный приз.
   // Выбираем его достаточно далеко от начала, чтобы было место для "разгона"
   // и достаточно далеко от конца, чтобы было место для "торможения".
-  const targetWinningIndex = 149; // Например, между 75 и 84
-  // ✅ ВСТАВЛЯЕМ ОТЛАДОЧНЫЕ СООБЩЕНИЯ
-  console.log("DEBUG: renderPrizeScroll - Целевой индекс:", targetWinningIndex)
-  console.log("DEBUG: renderPrizeScroll - Ожидаемый приз:", winningGiftCost)
+  const targetWinningIndex = 149 // Always target index 149 as requested
 
   console.log("DEBUG: renderPrizeScroll - Ожидаемый выигрышный приз (winningGiftCost):", winningGiftCost)
   console.log(
@@ -771,6 +764,20 @@ async function spinPrizes() {
   let animationFrameId // Для отслеживания requestAnimationFrame
   let animation // Объявляем здесь, чтобы был доступен в monitorAnimation
 
+  // --- START: CRITICAL RESET FOR ANIMATION CONSISTENCY ---
+  // Cancel any existing animations on the prizeScroll element
+  if (prizeScroll.getAnimations) {
+    prizeScroll.getAnimations().forEach((anim) => anim.cancel())
+    console.log("DEBUG: Cancelled all previous animations on prizeScroll.")
+  }
+  // Reset transform and transition to ensure a clean start
+  prizeScroll.style.transition = "none"
+  prizeScroll.style.transform = "translateX(0px)"
+  prizeScroll.offsetHeight // Force reflow to apply style changes immediately
+  await new Promise((resolve) => requestAnimationFrame(resolve)) // Wait for next frame to ensure render
+  console.log("DEBUG: Transform before animation start (after explicit reset):", prizeScroll.style.transform)
+  // --- END: CRITICAL RESET FOR ANIMATION CONSISTENCY ---
+
   try {
     let result = null
     if (!demoMode) {
@@ -793,10 +800,6 @@ async function spinPrizes() {
       console.log("DEBUG: Баланс после списания стоимости кейса (Демо):", userFantics)
       console.log("DEBUG: Симулированный выигрыш (Демо):", result.gift)
     }
-    // СБРОС трансформации перед анимацией (ГАРАНТИРОВАННЫЙ)
-prizeScroll.style.transition = "none"
-prizeScroll.style.transform = "translateX(0px)"
-await new Promise(resolve => requestAnimationFrame(resolve)) // дождаться кадра
 
     // Теперь, когда мы знаем выигрышный приз, генерируем ленту
     const targetWinningIndex = renderPrizeScroll(currentCase, result.gift)
@@ -842,9 +845,6 @@ await new Promise(resolve => requestAnimationFrame(resolve)) // дождатьс
     console.log("DEBUG: animationTargetTranslateX (animation's final point):", animationTargetTranslateX)
 
     // Reset transform before animation
-    prizeScroll.style.transition = "none"
-    prizeScroll.style.transform = "translateX(0px)" // Always start from 0
-    prizeScroll.offsetHeight // Force reflow
 
     animation = prizeScroll.animate(
       [
