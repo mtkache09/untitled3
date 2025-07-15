@@ -738,7 +738,8 @@ function openCasePage(caseData) {
 
 async function spinPrizes() {
   if (isSpinning) return
-
+  // Перерисовываем ленту ДО спина (сброс содержимого)
+  renderPrizeScroll(currentCase, 0)
   const demoMode = document.getElementById("demoMode").checked
   const prizeScroll = document.getElementById("prizeScroll")
   const openBtn = document.getElementById("openCaseBtn")
@@ -1031,7 +1032,7 @@ if (matrixMatch && matrixMatch.length >= 7) {
     // WAAPI с fill: 'forwards' уже держит конечное состояние, поэтому явный сброс transform не нужен
     // prizeScroll.style.transform = "translateX(0px)"
     // Перегенерируем для следующего спина, чтобы лента была "свежей"
-    renderPrizeScroll(currentCase, 0)
+    //renderPrizeScroll(currentCase, 0)
 
     openBtn.disabled = false
     openBtn.classList.remove("animate-pulse")
