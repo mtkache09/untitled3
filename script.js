@@ -1,3 +1,5 @@
+import { TonConnect } from "@tonconnect/sdk"
+
 const API_BASE = (() => {
   if (window.location.hostname === "mtkache09.github.io") {
     return "https://telegramcases-production.up.railway.app"
@@ -448,7 +450,7 @@ function renderPrizeScroll(caseData, winningGiftCost) {
   const prizeScroll = document.getElementById("prizeScroll")
   prizeScroll.innerHTML = ""
 
-  const possibleRewards = caseData.possible_rewards
+  const possibleRewards = caseData.presents // Используем caseData.presents напрямую
 
   const numPrizes = 150 // Генерируем больше призов для длинной прокрутки
   // Целевой индекс, куда будет помещен выигрышный приз.
@@ -576,19 +578,20 @@ function renderPossiblePrizes(caseData) {
   const possiblePrizes = document.getElementById("possiblePrizes")
   possiblePrizes.innerHTML = ""
 
-  caseData.possible_rewards.forEach((reward) => {
+  caseData.presents.forEach((present) => {
+    // Используем caseData.presents напрямую
     const prizeElement = document.createElement("div")
 
     let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
-    if (reward.cost >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
-    else if (reward.cost >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
-    else if (reward.cost >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
-    else if (reward.cost >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
+    if (present.cost >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
+    else if (present.cost >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
+    else if (present.cost >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
+    else if (present.cost >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
 
     prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
     prizeElement.innerHTML = `
-    <div class="font-bold">${reward.cost} 💎</div>
-    <div class="text-xs opacity-75">${reward.probability}%</div>
+    <div class="font-bold">${present.cost} 💎</div>
+    <div class="text-xs opacity-75">${present.probability}%</div>
 `
     possiblePrizes.appendChild(prizeElement)
   })
@@ -764,18 +767,12 @@ async function spinPrizes() {
   let animationFrameId // Для отслеживания requestAnimationFrame
   let animation // Объявляем здесь, чтобы был доступен в monitorAnimation
 
-  // --- START: CRITICAL RESET FOR ANIMATION CONSISTENCY ---
+  // --- START: CRITICAL RESET FOR ANIMATION CONSISTENCY (Moved and enhanced) ---
   // Cancel any existing animations on the prizeScroll element
   if (prizeScroll.getAnimations) {
     prizeScroll.getAnimations().forEach((anim) => anim.cancel())
     console.log("DEBUG: Cancelled all previous animations on prizeScroll.")
   }
-  // Reset transform and transition to ensure a clean start
-  prizeScroll.style.transition = "none"
-  prizeScroll.style.transform = "translateX(0px)"
-  prizeScroll.offsetHeight // Force reflow to apply style changes immediately
-  await new Promise((resolve) => requestAnimationFrame(resolve)) // Wait for next frame to ensure render
-  console.log("DEBUG: Transform before animation start (after explicit reset):", prizeScroll.style.transform)
   // --- END: CRITICAL RESET FOR ANIMATION CONSISTENCY ---
 
   try {
@@ -791,7 +788,7 @@ async function spinPrizes() {
       console.log("DEBUG: Результат от openCaseAPI:", result)
       console.log("DEBUG: Фактический выигрыш от сервера (result.gift):", result.gift)
     } else {
-      const possibleRewards = currentCase.possible_rewards
+      const possibleRewards = currentCase.presents // Используем currentCase.presents
       const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
       result = { gift: randomReward.cost, profit: randomReward.cost - currentCase.cost }
       // Для демо-режима также симулируем немедленное списание для визуальной консистентности
@@ -804,6 +801,14 @@ async function spinPrizes() {
     // Теперь, когда мы знаем выигрышный приз, генерируем ленту
     const targetWinningIndex = renderPrizeScroll(currentCase, result.gift)
     winningElement = prizeScroll.children[targetWinningIndex] // Присваиваем winningElement
+
+    // --- NEW: Explicitly reset transform AFTER rendering new elements ---
+    prizeScroll.style.transition = "none" // Remove any transition
+    prizeScroll.style.transform = "translateX(0px)" // Reset to initial position
+    prizeScroll.offsetHeight // Force reflow to apply style changes immediately
+    await new Promise((resolve) => requestAnimationFrame(resolve)) // Wait for next frame
+    console.log("DEBUG: prizeScroll reset to translateX(0px) after renderPrizeScroll and before offset calculation.")
+    // --- END NEW ---
 
     if (!winningElement) {
       console.error("ERROR: Winning element not found at target index:", targetWinningIndex)
@@ -843,8 +848,6 @@ async function spinPrizes() {
     // This makes the animation go further left than the final snap point, creating the spin.
     const animationTargetTranslateX = finalCenteredTranslateX - spinDistance
     console.log("DEBUG: animationTargetTranslateX (animation's final point):", animationTargetTranslateX)
-
-    // Reset transform before animation
 
     animation = prizeScroll.animate(
       [
@@ -933,18 +936,16 @@ async function spinPrizes() {
       console.log("DEBUG: Snap Correction - winningElement.offsetWidth (at snap):", winningElement.offsetWidth)
       console.log("DEBUG: Snap Correction - prizeScroll.getBoundingClientRect():", prizeScroll.getBoundingClientRect())
 
-      // ИСПРАВЛЕНО: Corrected regex for matrix parsing: using escaped parentheses
+      // ИСПРАВЛЕНО: Corrected regex for matrix parsing
       const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
       const matrixMatch = currentTransformStyle.match(matrixRegex)
 
       if (matrixMatch && matrixMatch.length >= 7) {
-        // Changed to 7 as matrix has 6 capturing groups + full match
-        // Should be 6 capturing groups for matrix(a,b,c,d,tx,ty)
         console.log("DEBUG: Snap Correction - matrixMatch found:", matrixMatch)
         console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5]) // tx is the 5th capturing group (index 5)
         actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
       } else {
-        // ИСПРАВЛЕНО: Corrected regex for translateX parsing: using escaped parentheses
+        // ИСПРАВЛЕНО: Corrected regex for translateX parsing
         const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
         if (translateXMatch && translateXMatch[1]) {
           actualCurrentTranslateX = Number.parseFloat(translateXMatch[1])
@@ -1064,9 +1065,8 @@ async function spinPrizes() {
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId)
     }
-    // WAAPI с fill: 'forwards' уже держит конечное состояние, поэтому явный сброс transform не нужен
-    // prizeScroll.style.transform = "translateX(0px)"
     // Перегенерируем для следующего спина, чтобы лента была "свежей"
+    // Это также сбросит transform, так как innerHTML будет заменен
     renderPrizeScroll(currentCase, 0)
 
     openBtn.disabled = false
@@ -1076,6 +1076,90 @@ async function spinPrizes() {
     console.log("DEBUG: UI сброшен, кнопка активна.")
   }
 }
+
+// --- NEW: TON Connect Integration ---
+// Initialize TonConnect
+const connector = new TonConnect({
+  manifestUrl: "https://raw.githubusercontent.com/ton-community/ton-connect-manifests/main/dapps/my-dapp.json", // !!! IMPORTANT: Replace with your dApp's actual manifest URL !!!
+  // For persistent connections, you might want to use a storage:
+  // storage: new TonConnectSDK.LocalStorage(),
+})
+
+async function connectTonWallet() {
+  if (isSpinning) {
+    showNotification("Подождите, пока завершится текущая операция.", "info")
+    return
+  }
+
+  const connectBtn = document.getElementById("connectTonWalletBtn")
+  connectBtn.disabled = true
+  const originalBtnText = connectBtn.innerHTML
+  connectBtn.innerHTML = '<span class="animate-pulse">Подключение...</span>'
+
+  try {
+    // Generate a connection request
+    const { universalLink } = await connector.connect()
+
+    // Open the universal link for the user to connect
+    // This will typically open a new tab or prompt a wallet app
+    window.open(universalLink, "_blank")
+
+    // Listen for connection status changes
+    const unsubscribe = connector.onStatusChange(async (wallet) => {
+      if (wallet) {
+        unsubscribe() // Stop listening once connected
+        const walletAddress = wallet.account.address
+        const userId = getUserId() // Assuming getUserId() is available from your existing script
+
+        console.log(`DEBUG: TON Wallet connected: ${walletAddress}`)
+        showNotification(`✅ TON Кошелек подключен: ${walletAddress.substring(0, 8)}...`, "success", 5000)
+
+        // Send wallet address to your backend
+        try {
+          const response = await fetch(`${API_BASE}/ton/connect`, {
+            method: "POST",
+            headers: {
+              ...getAuthHeaders(), // Include Telegram initData for user identification
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              user_id: userId,
+              wallet_address: walletAddress,
+            }),
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            console.log("DEBUG: Backend response for TON connect:", data)
+            showNotification("✅ Адрес TON кошелька сохранен на сервере!", "success", 3000)
+          } else {
+            const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
+            console.error("❌ Ошибка сохранения TON кошелька на сервере:", response.status, errorData)
+            showNotification(
+              `❌ Ошибка сохранения TON кошелька: ${errorData.detail || "Неизвестная ошибка"}`,
+              "error",
+              5000,
+            )
+          }
+        } catch (backendError) {
+          console.error("❌ Ошибка при отправке TON кошелька на сервер:", backendError)
+          showNotification("❌ Ошибка сети при сохранении TON кошелька.", "error", 5000)
+        }
+      } else {
+        console.log("DEBUG: TON Wallet disconnected or connection failed.")
+        showNotification("⚠️ Подключение TON кошелька отменено или не удалось.", "info", 3000)
+      }
+      connectBtn.innerHTML = originalBtnText
+      connectBtn.disabled = false
+    })
+  } catch (error) {
+    console.error("❌ Ошибка при инициализации TON Connect:", error)
+    showNotification(`❌ Ошибка TON Connect: ${error.message}`, "error", 5000)
+    connectBtn.innerHTML = originalBtnText
+    connectBtn.disabled = false
+  }
+}
+// --- END: NEW TON Connect Integration ---
 
 function goBack() {
   document.getElementById("casePage").classList.add("hidden")
@@ -1106,6 +1190,9 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
     closeDepositModal()
   }
 })
+
+// NEW: Event listener for TON Wallet Connect button
+document.getElementById("connectTonWalletBtn").addEventListener("click", connectTonWallet)
 
 async function initApp() {
   console.log("DEBUG: Начало initApp")
