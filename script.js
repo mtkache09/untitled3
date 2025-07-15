@@ -957,7 +957,7 @@ if (matrixMatch && matrixMatch.length >= 7) {
       console.log("DEBUG: Snap Correction - desiredTranslateXForCentering:", desiredTranslateXForCentering)
       console.log("DEBUG: Snap Correction - actualCurrentTranslateX (from style):", actualCurrentTranslateX)
       console.log("DEBUG: Snap Correction - adjustmentNeeded:", adjustmentNeeded)
-
+      console.log("DEBUG: Перед renderPrizeScroll, winningGiftCost =", winningGiftCost);
       // Применяем коррекцию, если отклонение значительное (например, более 0.5px)
       if (Math.abs(adjustmentNeeded) > 0.5) {
         prizeScroll.style.transition = "transform 0.3s ease-out" // Плавный переход для подгонки
