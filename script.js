@@ -453,11 +453,17 @@ prizeScroll.innerHTML = ""
 
 const possibleRewards = caseData.possible_rewards
 
-const numPrizes = 150 // Генерируем 150 призов для длинной ленты
-const targetWinningIndex = 55 // Жёстко фиксируем индекс выигрышного приза
+const numPrizes = 150 // Генерируем больше призов для длинной прокрутки
+// Целевой индекс, куда будет помещен выигрышный приз.
+// Выбираем его достаточно далеко от начала, чтобы было место для "разгона"
+// и достаточно далеко от конца, чтобы было место для "торможения".
+const targetWinningIndex = 75 + Math.floor(Math.random() * 10) // Например, между 75 и 84
 
 console.log("DEBUG: renderPrizeScroll - Ожидаемый выигрышный приз (winningGiftCost):", winningGiftCost)
-console.log("DEBUG: renderPrizeScroll - Целевой индекс выигрышного приза на ленте (targetWinningIndex):", targetWinningIndex)
+console.log(
+"DEBUG: renderPrizeScroll - Целевой индекс выигрышного приза на ленте (targetWinningIndex):",
+targetWinningIndex,
+)
 
 const lastTwoRewards = [null, null] // Для отслеживания последних двух призов
 
@@ -466,7 +472,7 @@ const prizeElement = document.createElement("div")
 let rewardValue
 
 if (i === targetWinningIndex) {
-// Вставляем фактический выигрышный приз в фиксированную позицию
+// Вставляем фактический выигрышный приз в целевую позицию
 rewardValue = winningGiftCost
 console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`)
 } else {
@@ -476,7 +482,7 @@ do {
 randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
 rewardValue = randomReward.cost
 attempts++
-// Защита от бесконечного цикла, если мало вариантов призов
+// Защита от бесконечного цикла, если нет других призов
 if (attempts > 50 && possibleRewards.length > 1) {
 console.warn("WARNING: Не удалось найти уникальный приз после 50 попыток. Возможно, мало вариантов призов.")
 break
@@ -484,6 +490,7 @@ break
 } while (lastTwoRewards[0] === rewardValue && lastTwoRewards[1] === rewardValue)
 }
 
+// Обновляем историю последних двух призов
 lastTwoRewards[0] = lastTwoRewards[1]
 lastTwoRewards[1] = rewardValue
 
@@ -493,23 +500,23 @@ else if (rewardValue >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to
 else if (rewardValue >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
 else if (rewardValue >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
 
+// ПРИНУДИТЕЛЬНО УСТАНАВЛИВАЕМ ШИРИНУ И ВЫСОТУ ЧЕРЕЗ STYLE
 prizeElement.className = `flex-shrink-0 w-20 h-20 min-w-[80px] max-w-[80px] ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20`
-prizeElement.style.width = "80px"
-prizeElement.style.height = "80px"
+prizeElement.style.width = "80px" // Принудительная установка ширины
+prizeElement.style.height = "80px" // Принудительная установка высоты
 prizeElement.textContent = `${rewardValue} 💎`
 prizeScroll.appendChild(prizeElement)
-
+// Добавляем лог для проверки вычисленной ширины элемента сразу после добавления в DOM
 console.log(
 `DEBUG: Rendered prize element width for ${rewardValue} 💎 (at index ${i}): ${prizeElement.offsetWidth}px (offsetWidth), ${prizeElement.getBoundingClientRect().width}px (getBoundingClientRect().width)`,
 )
 }
-
+// Добавляем лог для проверки вычисленной ширины элемента
 if (prizeScroll.firstElementChild) {
 const computedStyle = window.getComputedStyle(prizeScroll.firstElementChild)
 console.log("DEBUG: Computed prize element width (from getComputedStyle):", computedStyle.width)
 }
-
-return targetWinningIndex
+return targetWinningIndex // Возвращаем индекс, чтобы spinPrizes знал, куда целиться
 }
 
 function renderCases() {
@@ -739,8 +746,6 @@ renderPossiblePrizes(caseData)
 async function spinPrizes() {
 if (isSpinning) return
 
-  // Перерисовываем ленту ДО спина (сброс содержимого)
-  renderPrizeScroll(currentCase, 0)
 const demoMode = document.getElementById("demoMode").checked
 const prizeScroll = document.getElementById("prizeScroll")
 const openBtn = document.getElementById("openCaseBtn")
@@ -756,19 +761,21 @@ openBtn.disabled = true
 openBtnText.textContent = "Открываем..."
 openBtn.classList.add("animate-pulse")
 
-const initialBalanceBeforeSpin = userFantics
+const initialBalanceBeforeSpin = userFantics // Сохраняем баланс до начала операции
 
-let winningElement = null
-let animationFrameId
-let animation
+let winningElement = null // Объявляем здесь, чтобы был доступен в finally
+let animationFrameId // Для отслеживания requestAnimationFrame
+let animation // Объявляем здесь, чтобы был доступен в monitorAnimation
 
 try {
 let result = null
 if (!demoMode) {
+// 1. Списываем стоимость кейса с UI сразу
 userFantics -= currentCase.cost
 updateFanticsDisplay()
 console.log("DEBUG: Баланс после списания стоимости кейса (UI):", userFantics)
 
+// Вызываем API для открытия кейса (сервер сам обработает списание и добавление)
 result = await openCaseAPI(currentCase.id)
 console.log("DEBUG: Результат от openCaseAPI:", result)
 console.log("DEBUG: Фактический выигрыш от сервера (result.gift):", result.gift)
@@ -776,50 +783,68 @@ console.log("DEBUG: Фактический выигрыш от сервера (r
 const possibleRewards = currentCase.possible_rewards
 const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
 result = { gift: randomReward.cost, profit: randomReward.cost - currentCase.cost }
+// Для демо-режима также симулируем немедленное списание для визуальной консистентности
 userFantics -= currentCase.cost
 updateFanticsDisplay()
 console.log("DEBUG: Баланс после списания стоимости кейса (Демо):", userFantics)
 console.log("DEBUG: Симулированный выигрыш (Демо):", result.gift)
 }
 
-// Жёстко фиксируем индекс выигрыша
-const targetWinningIndex = 149
-renderPrizeScroll(currentCase, result.gift)
-winningElement = prizeScroll.children[targetWinningIndex]
+// Теперь, когда мы знаем выигрышный приз, генерируем ленту
+const targetWinningIndex = renderPrizeScroll(currentCase, result.gift)
+winningElement = prizeScroll.children[targetWinningIndex] // Присваиваем winningElement
 
 if (!winningElement) {
 console.error("ERROR: Winning element not found at target index:", targetWinningIndex)
 throw new Error("Winning element not found.")
 }
-console.log("DEBUG: Winning element identified (before animation):", winningElement.textContent, "at index", targetWinningIndex)
+console.log(
+"DEBUG: Winning element identified (before animation):",
+winningElement.textContent,
+"at index",
+targetWinningIndex,
+)
 
 const viewport = prizeScroll.parentElement
 const viewportWidth = viewport.offsetWidth
-const itemWidth = 80
-const gapValue = 16
-const effectiveItemWidth = itemWidth + gapValue
 
+// ИСПРАВЛЕНО: Принудительно устанавливаем itemWidth в 80px
+const itemWidth = 80
+console.log("DEBUG: Hardcoded itemWidth for animation calculations:", itemWidth)
+
+// ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
+const gapValue = 16 // Tailwind's gap-4 is 16px
+const effectiveItemWidth = itemWidth + gapValue
+console.log("DEBUG: Effective item width (calculated):", effectiveItemWidth)
+
+// Calculate the final desired translateX to center the winning element
+// This is the exact translateX value needed for the winning prize to be centered.
 const finalCenteredTranslateX = -(winningElement.offsetLeft + itemWidth / 2 - viewportWidth / 2)
 console.log("DEBUG: finalCenteredTranslateX (desired end position):", finalCenteredTranslateX)
 
-const overshootItems = 30
+// Calculate the total distance for "spinning" effect
+// Уменьшаем количество "лишних" прокручиваемых элементов
+const overshootItems = 30 // Прокручиваем на 30 элементов дальше, чем нужно, затем замедляемся
 const spinDistance = overshootItems * effectiveItemWidth
 console.log("DEBUG: spinDistance (extra for animation):", spinDistance)
 
+// The animation's target translateX will be the finalCenteredTranslateX MINUS the spinDistance.
+// This makes the animation go further left than the final snap point, creating the spin.
 const animationTargetTranslateX = finalCenteredTranslateX - spinDistance
 console.log("DEBUG: animationTargetTranslateX (animation's final point):", animationTargetTranslateX)
 
-prizeScroll.style.transform = "translateX(0px)"
-prizeScroll.offsetHeight
+// Reset transform before animation
+prizeScroll.style.transform = "translateX(0px)" // Always start from 0
+prizeScroll.offsetHeight // Force reflow
 
 animation = prizeScroll.animate(
 [
-{ transform: "translateX(0px)" },
-{ transform: `translateX(${animationTargetTranslateX}px)` },
+{ transform: "translateX(0px)" }, // Start from current position (0)
+{ transform: `translateX(${animationTargetTranslateX}px)` }, // Animate to this far left point
 ],
 {
-duration: 10000,
-easing: "cubic-bezier(0.25, 0.1, 0.25, 1)",
+duration: 10000, // УВЕЛИЧЕНА ДЛИТЕЛЬНОСТЬ ДО 10 СЕКУНД
+easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Smooth deceleration
 fill: "forwards",
 },
 )
@@ -932,7 +957,8 @@ console.log("DEBUG: Snap Correction - viewportWidth:", viewportWidth)
 console.log("DEBUG: Snap Correction - desiredTranslateXForCentering:", desiredTranslateXForCentering)
 console.log("DEBUG: Snap Correction - actualCurrentTranslateX (from style):", actualCurrentTranslateX)
 console.log("DEBUG: Snap Correction - adjustmentNeeded:", adjustmentNeeded)
-// console.log("DEBUG: Перед renderPrizeScroll, winningGiftCost =", winningGiftCost);
+      console.log("DEBUG: Перед renderPrizeScroll, winningGiftCost =", winningGiftCost);
+     // console.log("DEBUG: Перед renderPrizeScroll, winningGiftCost =", winningGiftCost);
 // Применяем коррекцию, если отклонение значительное (например, более 0.5px)
 if (Math.abs(adjustmentNeeded) > 0.5) {
 prizeScroll.style.transition = "transform 0.3s ease-out" // Плавный переход для подгонки
@@ -1033,8 +1059,7 @@ cancelAnimationFrame(animationFrameId)
 // WAAPI с fill: 'forwards' уже держит конечное состояние, поэтому явный сброс transform не нужен
 // prizeScroll.style.transform = "translateX(0px)"
 // Перегенерируем для следующего спина, чтобы лента была "свежей"
-    renderPrizeScroll(currentCase, 0)
-    //renderPrizeScroll(currentCase, 0)
+renderPrizeScroll(currentCase, 0)
 
 openBtn.disabled = false
 openBtn.classList.remove("animate-pulse")
