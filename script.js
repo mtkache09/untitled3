@@ -742,7 +742,9 @@ async function spinPrizes() {
   prizeScroll.style.transition = "none"
   prizeScroll.style.transform = "translateX(0px)"
   prizeScroll.offsetHeight // Форсим reflow
-
+    // Важно: отрисовать призы и подождать, чтобы DOM обновился
+  renderPrizeScroll(currentCase, 0);
+  await new Promise(requestAnimationFrame);
   // Проверка баланса
   if (!demoMode && userFantics < currentCase.cost) {
     showNotification("Недостаточно фантиков!", "error")
