@@ -465,7 +465,7 @@ function renderPrizeScroll(caseData, winningGiftCost) {
   // Целевой индекс, куда будет помещен выигрышный приз.
   // Выбираем его достаточно далеко от начала, чтобы было место для "разгона"
   // и достаточно далеко от конца, чтобы было место для "торможения".
-  const targetWinningIndex = 75 + Math.floor(Math.random() * 10) // Например, между 75 и 84
+  const targetWinningIndex = 149; // Например, между 75 и 84
 
   console.log("DEBUG: renderPrizeScroll - Ожидаемый выигрышный приз (winningGiftCost):", winningGiftCost)
   console.log(
