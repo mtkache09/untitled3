@@ -838,6 +838,7 @@ async function spinPrizes() {
     console.log("DEBUG: animationTargetTranslateX (animation's final point):", animationTargetTranslateX)
 
     // Reset transform before animation
+    prizeScroll.style.transition = "none"
     prizeScroll.style.transform = "translateX(0px)" // Always start from 0
     prizeScroll.offsetHeight // Force reflow
 
