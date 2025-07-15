@@ -737,13 +737,19 @@ function openCasePage(caseData) {
 }
 
 async function spinPrizes() {
-  if (isSpinning) return
-  // Перерисовываем ленту ДО спина (сброс содержимого)
-  renderPrizeScroll(currentCase, 0)
-  const demoMode = document.getElementById("demoMode").checked
+ if (isSpinning) return
+
+  // 🟡 ОБЯЗАТЕЛЬНО: prizeScroll нужен во всей функции
   const prizeScroll = document.getElementById("prizeScroll")
-  const openBtn = document.getElementById("openCaseBtn")
-  const openBtnText = document.getElementById("openBtnText")
+
+  // 🧼 СБРОС transform и анимации перед новым запуском
+  prizeScroll.getAnimations().forEach(anim => anim.cancel())
+  prizeScroll.style.transition = "none"
+  prizeScroll.style.transform = "translateX(0px)"
+  prizeScroll.offsetHeight // форсируем reflow
+
+  // ♻️ Обновляем ленту до начала новой анимации
+  renderPrizeScroll(currentCase, 0)
 
   if (!demoMode && userFantics < currentCase.cost) {
     showNotification("Недостаточно фантиков!", "error")
