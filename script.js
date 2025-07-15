@@ -462,30 +462,23 @@ function renderPrizeScroll(caseData, winningGiftCost) {
   const lastTwoRewards = [null, null] // Для отслеживания последних двух призов
 
   for (let i = 0; i < numPrizes; i++) {
-    const prizeElement = document.createElement("div")
-    let rewardValue
+  const prizeElement = document.createElement("div")
+  let rewardValue
 
-    if (i === targetWinningIndex) {
-      // Вставляем фактический выигрышный приз в фиксированную позицию
-      rewardValue = winningGiftCost
-      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`)
-    } else {
-      let randomReward
-      let attempts = 0
-      do {
-        randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
-        rewardValue = randomReward.cost
-        attempts++
-        // Защита от бесконечного цикла, если мало вариантов призов
-        if (attempts > 50 && possibleRewards.length > 1) {
-          console.warn("WARNING: Не удалось найти уникальный приз после 50 попыток. Возможно, мало вариантов призов.")
-          break
-        }
-      } while (lastTwoRewards[0] === rewardValue && lastTwoRewards[1] === rewardValue)
+  let randomReward
+  let attempts = 0
+  do {
+    randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
+    rewardValue = randomReward.cost
+    attempts++
+    if (attempts > 50 && possibleRewards.length > 1) {
+      console.warn("WARNING: Не удалось найти уникальный приз после 50 попыток.")
+      break
     }
+  } while (lastTwoRewards[0] === rewardValue && lastTwoRewards[1] === rewardValue)
 
-    lastTwoRewards[0] = lastTwoRewards[1]
-    lastTwoRewards[1] = rewardValue
+  lastTwoRewards[0] = lastTwoRewards[1]
+  lastTwoRewards[1] = rewardValue
 
     let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
     if (rewardValue >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
