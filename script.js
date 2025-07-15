@@ -453,32 +453,51 @@ function renderPrizeScroll(caseData, winningGiftCost) {
 
   const possibleRewards = caseData.possible_rewards
 
+  const numPrizes = 150 // Генерируем больше призов для длинной прокрутки
+  // Целевой индекс, куда будет помещен выигрышный приз.
+  // Выбираем его достаточно далеко от начала, чтобы было место для "разгона"
+  // и достаточно далеко от конца, чтобы было место для "торможения".
+  const targetWinningIndex = 75 + Math.floor(Math.random() * 10) // Например, между 75 и 84
   const numPrizes = 150 // Генерируем 150 призов для длинной ленты
   const targetWinningIndex = 149 // Жёстко фиксируем индекс выигрышного приза
 
   console.log("DEBUG: renderPrizeScroll - Ожидаемый выигрышный приз (winningGiftCost):", winningGiftCost)
+  console.log(
+    "DEBUG: renderPrizeScroll - Целевой индекс выигрышного приза на ленте (targetWinningIndex):",
+    targetWinningIndex,
+  )
   console.log("DEBUG: renderPrizeScroll - Целевой индекс выигрышного приза на ленте (targetWinningIndex):", targetWinningIndex)
 
   const lastTwoRewards = [null, null] // Для отслеживания последних двух призов
 
   for (let i = 0; i < numPrizes; i++) {
-  const prizeElement = document.createElement("div")
-  let rewardValue
+    const prizeElement = document.createElement("div")
+    let rewardValue
 
-  let randomReward
-  let attempts = 0
-  do {
-    randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
-    rewardValue = randomReward.cost
-    attempts++
-    if (attempts > 50 && possibleRewards.length > 1) {
-      console.warn("WARNING: Не удалось найти уникальный приз после 50 попыток.")
-      break
+    if (i === targetWinningIndex) {
+      // Вставляем фактический выигрышный приз в целевую позицию
+      // Вставляем фактический выигрышный приз в фиксированную позицию
+      rewardValue = winningGiftCost
+      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`)
+    } else {
+      let randomReward
+      let attempts = 0
+      do {
+        randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
+        rewardValue = randomReward.cost
+        attempts++
+        // Защита от бесконечного цикла, если нет других призов
+        // Защита от бесконечного цикла, если мало вариантов призов
+        if (attempts > 50 && possibleRewards.length > 1) {
+          console.warn("WARNING: Не удалось найти уникальный приз после 50 попыток. Возможно, мало вариантов призов.")
+          break
+        }
+      } while (lastTwoRewards[0] === rewardValue && lastTwoRewards[1] === rewardValue)
     }
-  } while (lastTwoRewards[0] === rewardValue && lastTwoRewards[1] === rewardValue)
 
-  lastTwoRewards[0] = lastTwoRewards[1]
-  lastTwoRewards[1] = rewardValue
+    // Обновляем историю последних двух призов
+    lastTwoRewards[0] = lastTwoRewards[1]
+    lastTwoRewards[1] = rewardValue
 
     let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
     if (rewardValue >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
@@ -486,21 +505,27 @@ function renderPrizeScroll(caseData, winningGiftCost) {
     else if (rewardValue >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
     else if (rewardValue >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
 
+    // ПРИНУДИТЕЛЬНО УСТАНАВЛИВАЕМ ШИРИНУ И ВЫСОТУ ЧЕРЕЗ STYLE
     prizeElement.className = `flex-shrink-0 w-20 h-20 min-w-[80px] max-w-[80px] ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20`
+    prizeElement.style.width = "80px" // Принудительная установка ширины
+    prizeElement.style.height = "80px" // Принудительная установка высоты
     prizeElement.style.width = "80px"
     prizeElement.style.height = "80px"
     prizeElement.textContent = `${rewardValue} 💎`
     prizeScroll.appendChild(prizeElement)
+    // Добавляем лог для проверки вычисленной ширины элемента сразу после добавления в DOM
 
     console.log(
       `DEBUG: Rendered prize element width for ${rewardValue} 💎 (at index ${i}): ${prizeElement.offsetWidth}px (offsetWidth), ${prizeElement.getBoundingClientRect().width}px (getBoundingClientRect().width)`,
     )
   }
+  // Добавляем лог для проверки вычисленной ширины элемента
 
   if (prizeScroll.firstElementChild) {
     const computedStyle = window.getComputedStyle(prizeScroll.firstElementChild)
     console.log("DEBUG: Computed prize element width (from getComputedStyle):", computedStyle.width)
   }
+  return targetWinningIndex // Возвращаем индекс, чтобы spinPrizes знал, куда целиться
 
   return targetWinningIndex
 }
@@ -732,122 +757,342 @@ function openCasePage(caseData) {
 async function spinPrizes() {
   if (isSpinning) return
 
+  const demoMode = document.getElementById("demoMode").checked
   const prizeScroll = document.getElementById("prizeScroll")
   const openBtn = document.getElementById("openCaseBtn")
   const openBtnText = document.getElementById("openBtnText")
-  const demoMode = document.getElementById("demoMode").checked
 
-  // Сброс анимаций и transform
-  prizeScroll.getAnimations().forEach(anim => anim.cancel())
-  prizeScroll.style.transition = "none"
-  prizeScroll.style.transform = "translateX(0px)"
-  prizeScroll.offsetHeight // Форсим reflow
-    // Важно: отрисовать призы и подождать, чтобы DOM обновился
-  renderPrizeScroll(currentCase, 0);
-  await new Promise(requestAnimationFrame);
-  // Проверка баланса
   if (!demoMode && userFantics < currentCase.cost) {
     showNotification("Недостаточно фантиков!", "error")
     return
   }
 
-  // Блокируем кнопку и меняем текст
   isSpinning = true
   openBtn.disabled = true
   openBtnText.textContent = "Открываем..."
   openBtn.classList.add("animate-pulse")
 
+  const initialBalanceBeforeSpin = userFantics // Сохраняем баланс до начала операции
   const initialBalanceBeforeSpin = userFantics
+
+  let winningElement = null // Объявляем здесь, чтобы был доступен в finally
+  let animationFrameId // Для отслеживания requestAnimationFrame
+  let animation // Объявляем здесь, чтобы был доступен в monitorAnimation
+  let winningElement = null
+  let animationFrameId
+  let animation
 
   try {
     let result = null
-
     if (!demoMode) {
+      // 1. Списываем стоимость кейса с UI сразу
       userFantics -= currentCase.cost
       updateFanticsDisplay()
+      console.log("DEBUG: Баланс после списания стоимости кейса (UI):", userFantics)
+
+      // Вызываем API для открытия кейса (сервер сам обработает списание и добавление)
       result = await openCaseAPI(currentCase.id)
+      console.log("DEBUG: Результат от openCaseAPI:", result)
+      console.log("DEBUG: Фактический выигрыш от сервера (result.gift):", result.gift)
     } else {
       const possibleRewards = currentCase.possible_rewards
       const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
       result = { gift: randomReward.cost, profit: randomReward.cost - currentCase.cost }
+      // Для демо-режима также симулируем немедленное списание для визуальной консистентности
       userFantics -= currentCase.cost
       updateFanticsDisplay()
+      console.log("DEBUG: Баланс после списания стоимости кейса (Демо):", userFantics)
+      console.log("DEBUG: Симулированный выигрыш (Демо):", result.gift)
     }
 
+    // Теперь, когда мы знаем выигрышный приз, генерируем ленту
+    const targetWinningIndex = renderPrizeScroll(currentCase, result.gift)
+    winningElement = prizeScroll.children[targetWinningIndex] // Присваиваем winningElement
+    // Жёстко фиксируем индекс выигрыша
     const targetWinningIndex = 149
-
-    // Отрисовываем ленту с призами и фиксируем выигрыш в индексе 149
     renderPrizeScroll(currentCase, result.gift)
+    winningElement = prizeScroll.children[targetWinningIndex]
 
-    // Получаем элемент выигрышного приза
-    const winningElement = prizeScroll.children[targetWinningIndex]
-    if (!winningElement) throw new Error(`Winning element not found at index ${targetWinningIndex}`)
+    if (!winningElement) {
+      console.error("ERROR: Winning element not found at target index:", targetWinningIndex)
+      throw new Error("Winning element not found.")
+    }
+    console.log(
+      "DEBUG: Winning element identified (before animation):",
+      winningElement.textContent,
+      "at index",
+      targetWinningIndex,
+    )
+    console.log("DEBUG: Winning element identified (before animation):", winningElement.textContent, "at index", targetWinningIndex)
 
-    // Параметры для анимации
     const viewport = prizeScroll.parentElement
     const viewportWidth = viewport.offsetWidth
-    const itemWidth = winningElement.offsetWidth || 80
-    const gapValue = 16 // Замени на актуальный gap из CSS
+
+    // ИСПРАВЛЕНО: Принудительно устанавливаем itemWidth в 80px
+    const itemWidth = 80
+    console.log("DEBUG: Hardcoded itemWidth for animation calculations:", itemWidth)
+
+    // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
+    const gapValue = 16 // Tailwind's gap-4 is 16px
+    const gapValue = 16
     const effectiveItemWidth = itemWidth + gapValue
+    console.log("DEBUG: Effective item width (calculated):", effectiveItemWidth)
 
-    // Рассчитываем смещение для центрирования выигрышного приза
-    const finalTranslateX = -(winningElement.offsetLeft + itemWidth / 2 - viewportWidth / 2)
+    // Calculate the final desired translateX to center the winning element
+    // This is the exact translateX value needed for the winning prize to be centered.
+    const finalCenteredTranslateX = -(winningElement.offsetLeft + itemWidth / 2 - viewportWidth / 2)
+    console.log("DEBUG: finalCenteredTranslateX (desired end position):", finalCenteredTranslateX)
 
-    // Добавляем "перекрут" — чтобы лента прокрутилась дальше для красивой анимации
+    // Calculate the total distance for "spinning" effect
+    // Уменьшаем количество "лишних" прокручиваемых элементов
+    const overshootItems = 30 // Прокручиваем на 30 элементов дальше, чем нужно, затем замедляемся
     const overshootItems = 30
     const spinDistance = overshootItems * effectiveItemWidth
-    const animationTargetTranslateX = finalTranslateX - spinDistance
+    console.log("DEBUG: spinDistance (extra for animation):", spinDistance)
 
-    // Сброс transform перед анимацией
+    // The animation's target translateX will be the finalCenteredTranslateX MINUS the spinDistance.
+    // This makes the animation go further left than the final snap point, creating the spin.
+    const animationTargetTranslateX = finalCenteredTranslateX - spinDistance
+    console.log("DEBUG: animationTargetTranslateX (animation's final point):", animationTargetTranslateX)
+
+    // Reset transform before animation
+    prizeScroll.style.transform = "translateX(0px)" // Always start from 0
+    prizeScroll.offsetHeight // Force reflow
     prizeScroll.style.transform = "translateX(0px)"
-    prizeScroll.offsetHeight // Форсим reflow
+    prizeScroll.offsetHeight
 
-    // Запускаем анимацию прокрутки
-    const animation = prizeScroll.animate(
+    animation = prizeScroll.animate(
       [
+        { transform: "translateX(0px)" }, // Start from current position (0)
+        { transform: `translateX(${animationTargetTranslateX}px)` }, // Animate to this far left point
         { transform: "translateX(0px)" },
         { transform: `translateX(${animationTargetTranslateX}px)` },
       ],
       {
+        duration: 10000, // УВЕЛИЧЕНА ДЛИТЕЛЬНОСТЬ ДО 10 СЕКУНД
+        easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Smooth deceleration
         duration: 10000,
         easing: "cubic-bezier(0.25, 0.1, 0.25, 1)",
         fill: "forwards",
-      }
+      },
     )
 
-    // Ждем окончания анимации
+    // === НАЧАЛО МОНИТОРИНГА АНИМАЦИИ ===
+    const logInterval = 100 // Логировать каждые 100 мс
+    let lastLogTime = 0
+
+    const monitorAnimation = (currentTime) => {
+      if (!isSpinning || animation.playState === "finished") {
+        // Остановить мониторинг, если спин завершен или анимация завершена
+        cancelAnimationFrame(animationFrameId)
+        return
+      }
+
+      if (currentTime - lastLogTime > logInterval) {
+        lastLogTime = currentTime
+
+        // Получаем текущий прогресс анимации
+        const animationProgress = animation.currentTime / animation.effect.getComputedTiming().duration
+        // Вычисляем текущий translateX на основе прогресса и animationTargetTranslateX
+        const currentTranslateX = animationProgress * animationTargetTranslateX
+
+        const winningElementRect = winningElement.getBoundingClientRect()
+        const viewportRect = viewport.getBoundingClientRect()
+
+        // Позиция центра выигрышного элемента относительно левого края viewport
+        const currentWinningElementCenterInViewport =
+          winningElementRect.left + winningElementRect.width / 2 - viewportRect.left
+
+        const desiredViewportCenter = viewportRect.width / 2
+        const distanceToCenter = currentWinningElementCenterInViewport - desiredViewportCenter
+
+        console.log(
+          `DEBUG: Анимация - Приз ${winningElement.textContent} | Прогресс: ${(animationProgress * 100).toFixed(2)}% | Расчетный translateX: ${currentTranslateX.toFixed(2)}px | Расстояние до центра: ${distanceToCenter.toFixed(2)}px`,
+        )
+      }
+
+      animationFrameId = requestAnimationFrame(monitorAnimation)
+    }
+
+    animationFrameId = requestAnimationFrame(monitorAnimation)
+    // === КОНЕЦ МОНИТОРИНГА АНИМАЦИИ ===
+
+    // Ждем точного завершения анимации
     await animation.finished
+    console.log("DEBUG: Основная анимация завершена (WAAPI).")
+    console.log("DEBUG: Element at final centered position (after animation):", winningElement.textContent)
 
-    // Плавно корректируем позицию до точного центрирования выигрышного приза
-    prizeScroll.style.transition = "transform 0.3s ease-out"
-    prizeScroll.style.transform = `translateX(${finalTranslateX}px)`
+    // Подсвечиваем выигрышный элемент
+    if (winningElement) {
+      winningElement.classList.add("winning-prize")
+      console.log("DEBUG: Визуально выделенный приз (из DOM):", winningElement.textContent)
+      console.log("DEBUG: Ожидаемый выигрышный приз (из API):", result.gift)
+      console.log(
+        `DEBUG: Сравнение: Выигрыш от сервера: ${result.gift}, Текст элемента: ${Number.parseInt(winningElement.textContent)}`,
+      ) // Добавлено для прямого сравнения
+      showNotification(`🎉 Вы выиграли ${result.gift} 💎!`, "success", 3000)
+    }
 
-    // Подсветка выигрышного приза
-    winningElement.classList.add("winning-prize")
-    showNotification(`🎉 Вы выиграли ${result.gift} 💎!`, "success", 3000)
+    // === НАЧАЛО ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ (SNAP CORRECTION) ===
+    try {
+      const viewport = prizeScroll.parentElement
+      const viewportWidth = viewport.offsetWidth
 
-    // Обновляем баланс с выигрышем
-    userFantics += result.gift
-    updateFanticsDisplay()
+      // desiredTranslateXForCentering уже равен finalCenteredTranslateX
+      const desiredTranslateXForCentering = finalCenteredTranslateX
 
-    // Эффект свечения (задержка)
-    await new Promise(resolve => setTimeout(resolve, 2000))
+      const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
+      let actualCurrentTranslateX = 0
 
+      console.log("DEBUG: Snap Correction - Raw transform style:", currentTransformStyle)
+      console.log(
+        "DEBUG: Snap Correction - winningElement.getBoundingClientRect().width (at snap):",
+        winningElement.getBoundingClientRect().width,
+      )
+      console.log("DEBUG: Snap Correction - winningElement.offsetWidth (at snap):", winningElement.offsetWidth)
+      console.log("DEBUG: Snap Correction - prizeScroll.getBoundingClientRect():", prizeScroll.getBoundingClientRect())
+
+      // ИСПРАВЛЕНО: Corrected regex for matrix parsing: using escaped parentheses
+   const matrixRegex = /matrix\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*(-?\d+\.?\d*),\s*([^)]+)\)/;
+const matrixMatch = currentTransformStyle.match(matrixRegex);
+
+if (matrixMatch && matrixMatch.length >= 7) {
+  // matrixMatch[5] — это translateX (tx)
+  console.log("DEBUG: Snap Correction - matrixMatch found:", matrixMatch);
+  console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5]);
+  actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]);
+} else {
+  const translateXMatch = currentTransformStyle.match(/translateX\((-?\d+\.?\d*)px\)/);
+  if (translateXMatch && translateXMatch[1]) {
+    actualCurrentTranslateX = Number.parseFloat(translateXMatch[1]);
+  } else {
+    console.warn(
+      "WARNING: Snap Correction - Could not parse transform style, unexpected format:",
+      currentTransformStyle,
+    );
+    // В случае ошибки парсинга берём значение из анимации
+    actualCurrentTranslateX = animationTargetTranslateX;
+  }
+}
+
+
+
+      // Вычисляем разницу между фактическим текущим положением и желаемым центрированным положением
+      const adjustmentNeeded = desiredTranslateXForCentering - actualCurrentTranslateX
+
+      console.log("DEBUG: Snap Correction - winningElement.offsetLeft:", winningElement.offsetLeft)
+      console.log("DEBUG: Snap Correction - viewportWidth:", viewportWidth)
+      console.log("DEBUG: Snap Correction - desiredTranslateXForCentering:", desiredTranslateXForCentering)
+      console.log("DEBUG: Snap Correction - actualCurrentTranslateX (from style):", actualCurrentTranslateX)
+      console.log("DEBUG: Snap Correction - adjustmentNeeded:", adjustmentNeeded)
+     // console.log("DEBUG: Перед renderPrizeScroll, winningGiftCost =", winningGiftCost);
+      // Применяем коррекцию, если отклонение значительное (например, более 0.5px)
+      if (Math.abs(adjustmentNeeded) > 0.5) {
+        prizeScroll.style.transition = "transform 0.3s ease-out" // Плавный переход для подгонки
+        prizeScroll.style.transform = `translateX(${desiredTranslateXForCentering}px)`
+        console.log(
+          "DEBUG: Snap Correction - Applied adjustment to exact desired position:",
+          desiredTranslateXForCentering,
+        )
+        await new Promise((resolve) => setTimeout(resolve, 300)) // Ждем завершения коррекции
+      } else {
+        console.log("DEBUG: Snap Correction - adjustment not needed, offset is minimal:", adjustmentNeeded)
+      }
+      console.log("DEBUG: Element at final snapped position (after correction):", winningElement.textContent)
+    } catch (snapError) {
+      console.error("ERROR: Ошибка в логике подгонки (snap correction):", snapError)
+      showNotification("⚠️ Ошибка анимации. Попробуйте еще раз.", "error")
+    }
+    // === КОНЕЦ ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ ===
+
+    // 2. Добавляем сумму выигрыша к балансу после анимации (UI)
+    if (!demoMode) {
+      userFantics += result.gift // Добавляем фактическую сумму выигрыша
+      updateFanticsDisplay()
+      console.log("DEBUG: Баланс после добавления выигрыша (UI):", userFantics)
+    } else {
+      userFantics += result.gift // Для демо-режима тоже
+      updateFanticsDisplay()
+      console.log("DEBUG: Баланс после добавления выигрыша (Демо):", userFantics)
+    }
+
+    // === НАЧАЛО ИЗМЕНЕНИЙ ДЛЯ ПОЛЛИНГА ===
+    const expectedBalance = initialBalanceBeforeSpin - currentCase.cost + result.gift
+    const maxRetries = 10
+    const retryInterval = 1000
+
+    console.log(`DEBUG: Ожидаемый баланс после транзакции: ${expectedBalance}`)
+    showConnectionStatus("Синхронизация баланса...")
+
+    let currentRetries = 0
+    let balanceSynced = false
+
+    try {
+      while (!balanceSynced && currentRetries < maxRetries) {
+        console.log(`DEBUG: Попытка синхронизации баланса #${currentRetries + 1}`)
+        const fetchedBalance = await fetchUserFantics()
+        if (fetchedBalance !== null && fetchedBalance === expectedBalance) {
+          balanceSynced = true
+          console.log("✅ Баланс успешно синхронизирован с сервером.")
+          showConnectionStatus("Баланс синхронизирован!")
+        } else {
+          console.log(
+            `DEBUG: Баланс не совпадает. Ожидаем: ${expectedBalance}, Получено: ${fetchedBalance}. Повторная попытка через ${retryInterval}ms.`,
+          )
+          await new Promise((resolve) => setTimeout(resolve, retryInterval))
+          currentRetries++
+        }
+      }
+
+      if (!balanceSynced) {
+        showNotification(
+          "⚠️ Не удалось синхронизировать баланс с сервером. Попробуйте обновить приложение.",
+          "error",
+          8000,
+        )
+        console.error("❌ Не удалось синхронизировать баланс после нескольких попыток.")
+        showConnectionStatus("Ошибка синхронизации баланса", true)
+      }
+    } catch (pollingError) {
+      console.error("ERROR: Ошибка в цикле поллинга баланса:", pollingError)
+      showNotification("⚠️ Ошибка синхронизации баланса. Попробуйте обновить приложение.", "error", 8000)
+      showConnectionStatus("Ошибка синхронизации баланса", true)
+    }
+    // === КОНЕЦ ИЗМЕНЕНИЙ ДЛЯ ПОЛЛИНГА ===
+
+    // Ждем завершения свечения приза
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    console.log("DEBUG: Свечение приза завершено.")
   } catch (error) {
     showNotification(`❌ Ошибка: ${error.message}`, "error")
-    if (!demoMode) {
-      userFantics = initialBalanceBeforeSpin
+    // В случае ошибки, если было оптимистичное списание, возвращаем баланс
+    if (!demoMode && initialBalanceBeforeSpin !== userFantics) {
+      userFantics = initialBalanceBeforeSpin // Возвращаем к начальному состоянию
       updateFanticsDisplay()
+      console.log("DEBUG: Баланс восстановлен после ошибки:", userFantics)
     }
+    // Всегда пытаемся получить актуальный баланс с сервера в случае ошибки
+    await fetchUserFantics()
+    console.error("DEBUG: Общая ошибка в spinPrizes:", error)
   } finally {
-    isSpinning = false
+    // Этот блок всегда выполняется, независимо от ошибок, для сброса UI
+    if (winningElement) {
+      winningElement.classList.remove("winning-prize")
+    }
+    // Отменяем мониторинг анимации
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId)
+    }
+    // WAAPI с fill: 'forwards' уже держит конечное состояние, поэтому явный сброс transform не нужен
+    // prizeScroll.style.transform = "translateX(0px)"
+    // Перегенерируем для следующего спина, чтобы лента была "свежей"
+    renderPrizeScroll(currentCase, 0)
+
     openBtn.disabled = false
     openBtn.classList.remove("animate-pulse")
-    openBtnText.textContent = "Открыть кейс"
-
-    // Снимаем выделение
-    const winningElement = prizeScroll.querySelector(".winning-prize")
-    if (winningElement) winningElement.classList.remove("winning-prize")
+    updateOpenButton()
+    isSpinning = false
+    console.log("DEBUG: UI сброшен, кнопка активна.")
   }
 }
 
