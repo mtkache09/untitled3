@@ -1077,61 +1077,72 @@ async function spinPrizes() {
   }
 }
 
-// --- NEW: TON Connect Integration ---
-// Initialize TonConnect
+// --- NEW: TON Connect Integration — c TON PROOF ---
 const connector = new TonConnect({
-  manifestUrl: "https://mtkache09.github.io/telegram-stars-case/manifest.json", // !!! IMPORTANT: Replace with your dApp's actual manifest URL !!!
-  // For persistent connections, you might want to use a storage:
-  // storage: new TonConnectSDK.LocalStorage(),
-})
+  manifestUrl: "https://mtkache09.github.io/telegram-stars-case/manifest.json",
+  // storage опционально
+});
 
 async function connectTonWallet() {
   if (isSpinning) {
-    showNotification("Подождите, пока завершится текущая операция.", "info")
-    return
+    showNotification("Подождите, пока завершится текущая операция.", "info");
+    return;
   }
 
-  const connectBtn = document.getElementById("connectTonWalletBtn")
-  connectBtn.disabled = true
-  const originalBtnText = connectBtn.innerHTML
-  connectBtn.innerHTML = '<span class="animate-pulse">Подключение...</span>'
+  const connectBtn = document.getElementById("connectTonWalletBtn");
+  connectBtn.disabled = true;
+  const originalBtnText = connectBtn.innerHTML;
+  connectBtn.innerHTML = '<span class="animate-pulse">Подключение...</span>';
 
   try {
-    // Generate a connection request
-    const { universalLink } = await connector.connect()
+    // === 1. Генерируем payload для TON Proof (лучше получить с backend, можно Date.now или crypto.randomUUID)
+    const tonProofPayload = Date.now().toString();
 
-    // Open the universal link for the user to connect
-    // This will typically open a new tab or prompt a wallet app
-    window.open(universalLink, "_blank")
+    // === 2. Вызов TON Connect с TON Proof
+    const { universalLink, tonProof } = await connector.connect({
+      tonProof: tonProofPayload
+    });
 
-    // Listen for connection status changes
+    // 3. Для пользователя: открываем ссылку с universal link
+    window.open(universalLink, "_blank");
+
+    // 4. Подписываемся на результат коннекта
     const unsubscribe = connector.onStatusChange(async (wallet) => {
+      connectBtn.innerHTML = originalBtnText;
+      connectBtn.disabled = false;
+
       if (wallet) {
-        unsubscribe() // Stop listening once connected
-        const walletAddress = wallet.account.address
-        const userId = getUserId() // Assuming getUserId() is available from your existing script
+        unsubscribe();
+        const walletAddress = wallet.account.address;
+        const userId = getUserId();
 
-        console.log(`DEBUG: TON Wallet connected: ${walletAddress}`)
-        showNotification(`✅ TON Кошелек подключен: ${walletAddress.substring(0, 8)}...`, "success", 5000)
+        // Получаем proof-данные (если есть)
+        const proofObj = tonProof && tonProof.proof ? tonProof.proof : null;
+        const publicKey = proofObj && proofObj.pubkey ? proofObj.pubkey : null;
 
-        // Send wallet address to your backend
+        // Формируем JSON для backend
+        const body = {
+          user_id: userId,
+          wallet_address: walletAddress,
+          proof: proofObj || undefined,
+          public_key: publicKey || undefined
+        };
+
+        // Отправляем на сервер
         try {
           const response = await fetch(`${API_BASE}/ton/connect`, {
             method: "POST",
             headers: {
-              ...getAuthHeaders(), // Include Telegram initData for user identification
+              ...getAuthHeaders(),
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              user_id: userId,
-              wallet_address: walletAddress,
-            }),
-          })
+            body: JSON.stringify(body),
+          });
 
           if (response.ok) {
-            const data = await response.json()
-            console.log("DEBUG: Backend response for TON connect:", data)
-            showNotification("✅ Адрес TON кошелька сохранен на сервере!", "success", 3000)
+            const data = await response.json();
+            console.log("DEBUG: Backend response for TON connect:", data);
+            showNotification("✅ Адрес TON кошелька сохранен на сервере!", "success", 3000);
           } else {
             const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
             console.error("❌ Ошибка сохранения TON кошелька на сервере:", response.status, errorData)
@@ -1142,24 +1153,21 @@ async function connectTonWallet() {
             )
           }
         } catch (backendError) {
-          console.error("❌ Ошибка при отправке TON кошелька на сервер:", backendError)
-          showNotification("❌ Ошибка сети при сохранении TON кошелька.", "error", 5000)
+          console.error("❌ Ошибка при отправке TON кошелька на сервер:", backendError);
+          showNotification("❌ Ошибка сети при сохранении TON кошелька.", "error", 5000);
         }
       } else {
-        console.log("DEBUG: TON Wallet disconnected or connection failed.")
-        showNotification("⚠️ Подключение TON кошелька отменено или не удалось.", "info", 3000)
+        console.log("DEBUG: TON Wallet disconnected or connection failed.");
+        showNotification("⚠️ Подключение TON кошелька отменено или не удалось.", "info", 3000);
       }
-      connectBtn.innerHTML = originalBtnText
-      connectBtn.disabled = false
-    })
+    });
   } catch (error) {
     console.error("❌ Ошибка при инициализации TON Connect:", error)
     showNotification(`❌ Ошибка TON Connect: ${error.message}`, "error", 5000)
     connectBtn.innerHTML = originalBtnText
     connectBtn.disabled = false
   }
-}
-// --- END: NEW TON Connect Integration ---
+}// --- END: NEW TON Connect Integration ---
 
 function goBack() {
   document.getElementById("casePage").classList.add("hidden")
