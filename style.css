@@ -113,3 +113,91 @@
   padding-right: calc(50% - 40px);
   transition: transform 0.3s ease-out; /* Default transition for snap */
 }
+
+/* Стили для TON Connect UI */
+#ton-connect-ui {
+  margin-bottom: 1rem;
+}
+
+/* Кастомизация кнопки TON Connect */
+#ton-connect-ui .ton-connect-button {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+  border: none !important;
+  border-radius: 0.5rem !important;
+  color: white !important;
+  font-weight: 600 !important;
+  padding: 0.75rem 1.5rem !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+#ton-connect-ui .ton-connect-button:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+#ton-connect-ui .ton-connect-button:active {
+  transform: translateY(0) !important;
+}
+
+/* Стили для модального окна TON Connect */
+.ton-connect-modal {
+  background: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.ton-connect-modal .ton-connect-modal__content {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%) !important;
+  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+  border-radius: 1rem !important;
+  color: white !important;
+}
+
+/* Стили для списка кошельков */
+.ton-connect-modal .ton-connect-modal__wallet-list {
+  background: rgba(31, 41, 55, 0.8) !important;
+  border-radius: 0.5rem !important;
+}
+
+.ton-connect-modal .ton-connect-modal__wallet-item {
+  background: rgba(55, 65, 81, 0.8) !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+  border-radius: 0.5rem !important;
+  color: white !important;
+  transition: all 0.3s ease !important;
+}
+
+.ton-connect-modal .ton-connect-modal__wallet-item:hover {
+  background: rgba(59, 130, 246, 0.2) !important;
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Стили для заголовков в модальном окне */
+.ton-connect-modal h1,
+.ton-connect-modal h2,
+.ton-connect-modal h3 {
+  color: white !important;
+}
+
+/* Стили для текста в модальном окне */
+.ton-connect-modal p {
+  color: #d1d5db !important;
+}
+
+/* Стили для кнопок в модальном окне */
+.ton-connect-modal button {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 0.5rem !important;
+  padding: 0.75rem 1.5rem !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+}
+
+.ton-connect-modal button:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+  transform: translateY(-1px) !important;
+}

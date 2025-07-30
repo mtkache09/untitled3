@@ -1,0 +1,18 @@
+{
+  "url": "https://mtkache09.github.io/telegram-stars-case/",
+  "name": "Fantics Casino - Telegram Mini App",
+  "iconUrl": "https://ton.org/download/ton_symbol.png",
+  "termsOfUseUrl": "https://mtkache09.github.io/telegram-stars-case/terms.html",
+  "privacyPolicyUrl": "https://mtkache09.github.io/telegram-stars-case/terms.html",
+  "features": ["ton_addr", "ton_proof"],
+  "items": [
+    {
+      "name": "ton_addr",
+      "description": "Request wallet address"
+    },
+    {
+      "name": "ton_proof",
+      "description": "Request TON proof for authentication"
+    }
+  ]
+} 

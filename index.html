@@ -6,6 +6,7 @@
   <title>Telegram Stars Case</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <link rel="stylesheet" href="style.css"> <!-- Linked external CSS file -->
 </head>
 <body class="min-h-screen bg-gradient-to-br from-black via-gray-900 to-purple-900">
@@ -57,6 +58,10 @@
               </svg>
               Подключить TON Кошелек
           </button>
+      </div>
+
+      <!-- TON Connect UI Container -->
+      <div id="ton-connect-ui" class="mb-4"></div>
       </div>
 
       <!-- Cases Section -->

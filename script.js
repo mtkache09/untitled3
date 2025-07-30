@@ -1,5 +1,3 @@
-import { TonConnect } from "@tonconnect/sdk"
-
 const API_BASE = (() => {
   if (window.location.hostname === "mtkache09.github.io") {
     return "https://telegramcases-production.up.railway.app"
@@ -26,6 +24,14 @@ if (tg) {
   tg.setHeaderColor("#1a1a2e")
   tg.setBackgroundColor("#16213e")
 }
+
+// Глобальные переменные
+let tonConnectUI = null
+let walletData = null
+let currentCase = null
+let isSpinning = false
+let userFantics = 0
+let selectedDepositAmount = null
 
 // Функция для получения авторизационных заголовков
 function getAuthHeaders() {
@@ -98,1077 +104,713 @@ function handleApiError(response, error) {
       }
       break
     case 403:
-      showNotification("❌ Доступ запрещен. Вы можете управлять только своим аккаунтом", "error", 5000)
+      showNotification("❌ Доступ запрещен", "error", 5000)
       console.error("403 Forbidden:", error)
       break
     case 404:
-      showNotification("❌ Ресурс не найден", "error")
+      showNotification("❌ Ресурс не найден", "error", 5000)
       console.error("404 Not Found:", error)
       break
-    case 400:
-      // Обрабатываем специфичные ошибки бизнес-логики
-      const message = error?.detail || "Неверный запрос"
-      showNotification(`❌ ${message}`, "error", 5000)
-      console.error("400 Bad Request:", error)
-      break
     case 500:
-      showNotification("❌ Ошибка сервера. Попробуйте позже", "error")
-      console.error("500 Server Error:", error)
+      showNotification("❌ Ошибка сервера", "error", 5000)
+      console.error("500 Internal Server Error:", error)
       break
     default:
-      showNotification(`❌ Ошибка: ${error?.detail || error?.message || "Неизвестная ошибка"}`, "error")
-      console.error("API Error:", error)
+      showNotification(`❌ Ошибка: ${error?.detail || "Неизвестная ошибка"}`, "error", 5000)
+      console.error("API Error:", response?.status, error)
   }
 }
 
-let userFantics = 0
-let cases = []
-let currentCase = null
-let isSpinning = false
-let selectedDepositAmount = null
-
-const depositAmounts = [
-  { amount: 1000, bonus: 0, popular: false },
-  { amount: 2500, bonus: 250, popular: false },
-  { amount: 5000, bonus: 750, popular: true },
-  { amount: 10000, bonus: 2000, popular: false },
-  { amount: 25000, bonus: 5000, popular: false },
-  { amount: 50000, bonus: 15000, popular: false },
-]
-
-// Функция для показа красивых уведомлений вместо alert
+// Функция для показа уведомлений
 function showNotification(message, type = "info", duration = 3000) {
-  // Удал��ем предыдущие уведомления
-  const existingNotifications = document.querySelectorAll(".notification")
-  existingNotifications.forEach((notification) => {
-    notification.remove()
-  })
-
+  // Создаем элемент уведомления
   const notification = document.createElement("div")
-  notification.className = `notification ${type}`
+  notification.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg max-w-sm transform transition-all duration-300 translate-x-full`
+  
+  // Настраиваем стили в зависимости от типа
+  switch (type) {
+    case "success":
+      notification.className += " bg-green-500 text-white"
+      break
+    case "error":
+      notification.className += " bg-red-500 text-white"
+      break
+    case "warning":
+      notification.className += " bg-yellow-500 text-white"
+      break
+    default:
+      notification.className += " bg-blue-500 text-white"
+  }
+  
   notification.textContent = message
-
   document.body.appendChild(notification)
-
-  // Автоматически скрываем уведомление
+  
+  // Анимация появления
   setTimeout(() => {
-    notification.classList.add("hide")
+    notification.classList.remove("translate-x-full")
+  }, 100)
+  
+  // Автоматическое удаление
+  setTimeout(() => {
+    notification.classList.add("translate-x-full")
     setTimeout(() => {
       if (notification.parentNode) {
-        notification.remove()
+        notification.parentNode.removeChild(notification)
       }
     }, 300)
   }, duration)
 }
 
+// Функция для показа статуса соединения
 function showConnectionStatus(message, isError = false) {
   const statusDiv = document.getElementById("connectionStatus")
   const statusText = document.getElementById("statusText")
-
-  if (!statusDiv || !statusText) {
-    console.error("DEBUG: Элементы статуса подключения не найдены!")
-    return
-  }
-
-  statusText.textContent = message
-  statusDiv.className = `mb-4 p-3 rounded-lg text-center text-sm font-medium ${
-    isError
-      ? "bg-red-900/50 text-red-300 border border-red-700/50"
-      : "bg-blue-900/50 text-blue-300 border border-blue-700/50"
-  }`
-  statusDiv.classList.remove("hidden")
-
-  if (!isError) {
-    setTimeout(() => {
-      statusDiv.classList.add("hidden")
-    }, 3000)
+  
+  if (statusDiv && statusText) {
+    statusDiv.classList.remove("hidden")
+    statusText.textContent = message
+    
+    if (isError) {
+      statusDiv.className = statusDiv.className.replace("bg-green-500", "bg-red-500")
+      statusDiv.className = statusDiv.className.replace("bg-blue-500", "bg-red-500")
+      if (!statusDiv.className.includes("bg-red-500")) {
+        statusDiv.className += " bg-red-500"
+      }
+    } else {
+      statusDiv.className = statusDiv.className.replace("bg-red-500", "bg-green-500")
+      statusDiv.className = statusDiv.className.replace("bg-blue-500", "bg-green-500")
+      if (!statusDiv.className.includes("bg-green-500")) {
+        statusDiv.className += " bg-green-500"
+      }
+    }
   }
 }
 
+// Функция для получения баланса пользователя
 async function fetchUserFantics() {
-  console.log("DEBUG: Начало fetchUserFantics")
   try {
-    const userId = getUserId()
-    const url = `${API_BASE}/fantics/${userId}`
-
-    console.log("📡 Запрос баланса:")
-    console.log("   URL:", url)
-    console.log("   User ID:", userId)
-    console.log("   API Base:", API_BASE)
-    console.log("   Авторизация доступна:", isAuthAvailable())
-
-    const response = await fetch(url, {
-      method: "GET",
+    console.log("🔄 Запрос баланса пользователя...")
+    
+    const response = await fetch(`${API_BASE}/user/fantics`, {
       headers: getAuthHeaders(),
-      mode: "cors",
     })
-
-    console.log("📡 Ответ сервера:", response.status, response.statusText)
-
+    
     if (response.ok) {
       const data = await response.json()
-      console.log("📡 Данные получены:", data)
-      userFantics = data.fantics
-      updateFanticsDisplay()
+      userFantics = data.fantics || 0
       console.log("✅ Баланс получен:", userFantics)
-      return userFantics // Возвращаем баланс
+      updateFanticsDisplay()
     } else {
       const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
       console.error("❌ Ошибка получения баланса:", response.status, errorData)
       handleApiError(response, errorData)
-      showConnectionStatus("Ошибка получения баланса", true)
-      return null // Возвращаем null в случае ошибки
     }
   } catch (error) {
-    console.error("❌ Ошибка API:", error)
-    console.error("   Тип ошибки:", error.name)
-    console.error("   Сообщение:", error.message)
-
-    if (!isAuthAvailable()) {
-      showConnectionStatus("Требуется авторизация Telegram", true)
-      showNotification("⚠️ Приложение работает только в Telegram", "error", 8000)
-    } else {
-      showConnectionStatus("Сервер недоступен", true)
-    }
-
-    // В случае ошибки показываем нулевой баланс
-    userFantics = 0
-    updateFanticsDisplay()
-    return null // Возвращаем null в случае ошибки
+    console.error("❌ Ошибка сети при получении баланса:", error)
+    showNotification("❌ Ошибка сети при получении баланса", "error", 5000)
   }
-  console.log("DEBUG: Конец fetchUserFantics")
 }
 
+// Функция для получения списка кейсов
 async function fetchCases() {
-  console.log("DEBUG: Начало fetchCases")
   try {
-    const url = `${API_BASE}/cases`
-    console.log("📡 Запрос кейсов:", url)
-
-    const response = await fetch(url, {
-      method: "GET",
+    console.log("🔄 Запрос списка кейсов...")
+    
+    const response = await fetch(`${API_BASE}/cases`, {
       headers: getAuthHeaders(),
-      mode: "cors",
     })
-
-    console.log("📡 Ответ сервера (кейсы):", response.status)
-
+    
     if (response.ok) {
-      const rawCases = await response.json()
-      console.log("📡 Сырые данные кейсов:", rawCases)
-
-      // Преобразуем новый формат в старый для совместимости
-      cases = rawCases.map((caseData) => ({
-        ...caseData,
-        possible_rewards: caseData.presents.map((present) => ({
-          cost: present.cost,
-          probability: present.probability,
-        })),
-      }))
-
-      console.log("📡 Преобразованные кейсы:", cases)
-      renderCases()
-      console.log("✅ Кейсы загружены:", cases.length)
+      const data = await response.json()
+      console.log("✅ Кейсы получены:", data)
+      renderCases(data)
     } else {
-      const errorData = await response.json().catch(() => ({ detail: "Ошибка загрузки кейсов" }))
+      const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
       console.error("❌ Ошибка получения кейсов:", response.status, errorData)
       handleApiError(response, errorData)
-      showConnectionStatus("Ошибка загрузки кейсов", true)
-      // Показываем пустой список кейсов
-      cases = []
-      renderCases()
     }
   } catch (error) {
-    console.error("❌ Ошибка получения кейсов:", error)
-    showConnectionStatus("Сервер недоступен", true)
-    // Показываем пустой список кейсов
-    cases = []
-    renderCases()
+    console.error("❌ Ошибка сети при получении кейсов:", error)
+    showNotification("❌ Ошибка сети при получении кейсов", "error", 5000)
   }
-  console.log("DEBUG: Конец fetchCases")
 }
 
-// Функция для тестирования соединения и авторизации
+// Функция для тестирования соединения
 async function testConnection() {
-  console.log("=== ТЕСТ СОЕДИНЕНИЯ И АВТОРИЗАЦИИ ===")
-  console.log("API Base:", API_BASE)
-  console.log("User ID:", getUserId())
-  console.log("Авторизация доступна:", isAuthAvailable())
-  console.log("Init Data:", window.Telegram?.WebApp?.initData ? "Есть" : "Нет")
-
-  // Показываем заголовки для отладки
-  const headers = getAuthHeaders()
-  console.log("Заголовки запроса:", headers)
-
   try {
-    // Тест 1: Проверка основного API (не требует авторизации)
-    console.log("📡 Тест 1: Проверка /")
-    const response1 = await fetch(`${API_BASE}/`)
-    const data1 = await response1.json()
-    console.log("✅ Основной API:", data1)
-
-    // Тест 2: Проверка fantics (требует авторизации)
-    console.log("📡 Тест 2: Проверка /fantics/")
-    const userId = getUserId()
-    const response2 = await fetch(`${API_BASE}/fantics/${userId}`, {
+    console.log("🔄 Тестирование соединения с сервером...")
+    
+    const response = await fetch(`${API_BASE}/health`, {
       headers: getAuthHeaders(),
     })
-
-    if (response2.ok) {
-      const data2 = await response2.json()
-      console.log("✅ Fantics endpoint:", data2)
+    
+    if (response.ok) {
+      const data = await response.json()
+      console.log("✅ Соединение с сервером установлено:", data)
+      showConnectionStatus("✅ Соединение с сервером установлено", false)
     } else {
-      const error2 = await response2.json()
-      console.log("❌ Fantics endpoint error:", response2.status, error2)
-    }
-
-    // Тест 3: Проверка кейсов (может не требовать авторизации)
-    console.log("📡 Тест 3: Проверка /cases")
-    const response3 = await fetch(`${API_BASE}/cases`, {
-      headers: getAuthHeaders(),
-    })
-
-    if (response3.ok) {
-      const data3 = await response3.json()
-      console.log("✅ Cases endpoint:", data3.length, "кейсов")
-    } else {
-      const error3 = await response3.json()
-      console.log("❌ Cases endpoint error:", response3.status, error3)
+      console.error("❌ Ошибка соединения с сервером:", response.status)
+      showConnectionStatus("❌ Ошибка соединения с сервером", true)
     }
   } catch (error) {
-    console.error("❌ Ошибка тестирования:", error)
+    console.error("❌ Ошибка сети при тестировании соединения:", error)
+    showConnectionStatus("❌ Ошибка сети при тестировании соединения", true)
   }
 }
 
+// Функция для открытия кейса через API
 async function openCaseAPI(caseId) {
   try {
-    const userId = getUserId()
-    const url = `${API_BASE}/open_case/${caseId}`
-
-    console.log("📡 Открытие кейса:", url)
-    console.log("   User ID:", userId)
-    console.log("   Case ID:", caseId)
-    showConnectionStatus("Открытие кейса...")
-
-    const response = await fetch(url, {
+    console.log("🔄 Открытие кейса:", caseId)
+    
+    const response = await fetch(`${API_BASE}/cases/${caseId}/open`, {
       method: "POST",
       headers: getAuthHeaders(),
-      // Убираем body - user_id должен браться из авторизации
-      mode: "cors",
     })
-
-    console.log("📡 Ответ сервера:", response.status, response.statusText)
-
+    
     if (response.ok) {
-      const result = await response.json()
-      console.log("✅ Кейс открыт:", result)
-      console.log("DEBUG: Фактический выигрыш от сервера (result.gift):", result.gift) // Добавлено
-      showConnectionStatus("Кейс открыт!")
-      return result
+      const data = await response.json()
+      console.log("✅ Кейс открыт:", data)
+      return data
     } else {
       const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
       console.error("❌ Ошибка открытия кейса:", response.status, errorData)
       handleApiError(response, errorData)
-      throw new Error(errorData.detail || "Ошибка открытия кейса")
+      return null
     }
   } catch (error) {
-    console.error("❌ Ошибка открытия кейса:", error)
-    showConnectionStatus(`Ошибка: ${error.message}`, true)
-    throw error
+    console.error("❌ Ошибка сети при открытии кейса:", error)
+    showNotification("❌ Ошибка сети при открытии кейса", "error", 5000)
+    return null
   }
 }
 
+// Функция для добавления фантиков
 async function addFantics(amount) {
   try {
-    const userId = getUserId()
-    console.log("📡 Пополнение баланса:", amount, "для пользователя:", userId)
-
-    if (!isAuthAvailable()) {
-      throw new Error("Пополнение доступно только в Telegram WebApp")
-    }
-
-    showConnectionStatus("Пополнение баланса...")
-
-    const response = await fetch(`${API_BASE}/fantics/add`, {
+    console.log("🔄 Добавление фантиков:", amount)
+    
+    const response = await fetch(`${API_BASE}/user/fantics`, {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify({
-        amount: amount,
-      }),
-      mode: "cors",
+      body: JSON.stringify({ amount }),
     })
-
-    console.log("📡 Ответ сервера (пополнение):", response.status)
-
+    
     if (response.ok) {
-      const result = await response.json()
-      console.log("✅ Пополнение успешно:", result)
-      showConnectionStatus("Баланс пополняется...")
-
-      const delay = API_BASE.includes("localhost") ? 1000 : 3000
-      setTimeout(() => {
-        fetchUserFantics()
-      }, delay)
+      const data = await response.json()
+      userFantics = data.fantics || 0
+      console.log("✅ Фантики добавлены:", userFantics)
+      updateFanticsDisplay()
       return true
     } else {
-      // Здесь добавляем подробный вывод ошибки
-      const errorData = await response.json().catch(() => ({ detail: "Ошибка пополнения" }))
-      console.error("❌ Ошибка пополнения:", response.status, errorData)
-      // Добавляем вывод детального содержания ошибки
-      console.error("❌ Ошибка пополнения - detail:", JSON.stringify(errorData.detail, null, 2))
+      const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
+      console.error("❌ Ошибка добавления фантиков:", response.status, errorData)
       handleApiError(response, errorData)
       return false
     }
   } catch (error) {
-    showNotification(`❌ ${error.message}`, "error")
+    console.error("❌ Ошибка сети при добавлении фантиков:", error)
+    showNotification("❌ Ошибка сети при добавлении фантиков", "error", 5000)
     return false
   }
 }
 
+// Функция для обновления отображения фантиков
 function updateFanticsDisplay() {
-  document.getElementById("userStars").textContent = userFantics.toLocaleString()
-  document.getElementById("userStarsCase").textContent = userFantics.toLocaleString()
-  document.getElementById("modalUserStars").textContent = userFantics.toLocaleString()
+  const userStarsElements = document.querySelectorAll("#userStars, #userStarsCase, #modalUserStars")
+  userStarsElements.forEach((element) => {
+    if (element) {
+      element.textContent = userFantics
+    }
+  })
 }
 
+// Функция для обновления кнопки открытия
 function updateOpenButton() {
-  const demoMode = document.getElementById("demoMode").checked
+  const openBtn = document.getElementById("openCaseBtn")
+  const demoMode = document.getElementById("demoMode")
   const openBtnText = document.getElementById("openBtnText")
-
-  if (demoMode) {
-    openBtnText.textContent = "Открыть бесплатно"
-    document.getElementById("openCaseBtn").className =
-      "w-full h-14 bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 text-white font-bold text-lg shadow-lg rounded-lg transition-all mb-8"
+  
+  if (!openBtn || !demoMode || !openBtnText) return
+  
+  if (demoMode.checked) {
+    openBtn.disabled = false
+    openBtnText.textContent = "Открыть кейс (Демо)"
   } else {
-    openBtnText.textContent = `Открыть за ${currentCase.cost} 💎`
-    document.getElementById("openCaseBtn").className =
-      "w-full h-14 bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white font-bold text-lg shadow-lg rounded-lg transition-all mb-8"
+    if (userFantics >= (currentCase?.cost || 0)) {
+      openBtn.disabled = false
+      openBtnText.textContent = `Открыть кейс (${currentCase?.cost || 0} 💎)`
+    } else {
+      openBtn.disabled = true
+      openBtnText.textContent = "Недостаточно фантиков"
+    }
   }
 }
 
+// Функция для рендеринга призов в скролле
 function renderPrizeScroll(caseData, winningGiftCost) {
   const prizeScroll = document.getElementById("prizeScroll")
+  if (!prizeScroll || !caseData) return
+  
   prizeScroll.innerHTML = ""
-
-  const possibleRewards = caseData.presents // Используем caseData.presents напрямую
-
-  const numPrizes = 150 // Генерируем больше призов для длинной прокрутки
-  // Целевой индекс, куда будет помещен выигрышный приз.
-  // Выбираем его достаточно далеко от начала, чтобы было место для "разгона"
-  // и достаточно далеко от конца, чтобы было место для "торможения".
-  const targetWinningIndex = 149 // Always target index 149 as requested
-
-  console.log("DEBUG: renderPrizeScroll - Ожидаемый выигрышный приз (winningGiftCost):", winningGiftCost)
-  console.log(
-    "DEBUG: renderPrizeScroll - Целевой индекс выигрышного приза на ленте (targetWinningIndex):",
-    targetWinningIndex,
-  )
-
-  const lastTwoRewards = [null, null] // Для отслеживания последних двух призов
-
-  for (let i = 0; i < numPrizes; i++) {
+  
+  // Создаем массив призов для отображения
+  const prizes = []
+  
+  // Добавляем призы из возможных призов
+  if (caseData.possible_prizes) {
+    caseData.possible_prizes.forEach((prize) => {
+      for (let i = 0; i < prize.chance; i++) {
+        prizes.push(prize)
+      }
+    })
+  }
+  
+  // Перемешиваем призы
+  for (let i = prizes.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[prizes[i], prizes[j]] = [prizes[j], prizes[i]]
+  }
+  
+  // Создаем элементы призов
+  prizes.forEach((prize) => {
     const prizeElement = document.createElement("div")
-    let rewardValue
-
-    if (i === targetWinningIndex) {
-      // Вставляем фактический выигрышный приз в целевую позицию
-      rewardValue = winningGiftCost
-      console.log(`DEBUG: renderPrizeScroll - Приз ${rewardValue} 💎 помещен в индекс ${i} (целевой).`)
-    } else {
-      let randomReward
-      let attempts = 0
-      do {
-        randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
-        rewardValue = randomReward.cost
-        attempts++
-        // Защита от бесконечного цикла, если нет других призов
-        if (attempts > 50 && possibleRewards.length > 1) {
-          console.warn("WARNING: Не удалось найти уникальный приз после 50 попыток. Возможно, мало вариантов призов.")
-          break
-        }
-      } while (lastTwoRewards[0] === rewardValue && lastTwoRewards[1] === rewardValue)
-    }
-
-    // Обновляем историю последних двух призов
-    lastTwoRewards[0] = lastTwoRewards[1]
-    lastTwoRewards[1] = rewardValue
-
-    let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
-    if (rewardValue >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
-    else if (rewardValue >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
-    else if (rewardValue >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
-    else if (rewardValue >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
-
-    // ПРИНУДИТЕЛЬНО УСТАНАВЛИВАЕМ ШИРИНУ И ВЫСОТУ ЧЕРЕЗ STYLE
-    prizeElement.className = `flex-shrink-0 w-20 h-20 min-w-[80px] max-w-[80px] ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-lg border border-white/20`
-    prizeElement.style.width = "80px" // Принудительная установка ширины
-    prizeElement.style.height = "80px" // Принудительная установка высоты
-    prizeElement.textContent = `${rewardValue} 💎`
+    prizeElement.className = "flex-shrink-0 w-32 h-32 bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg flex flex-col items-center justify-center text-white shadow-lg border border-purple-500/30"
+    
+    const iconElement = document.createElement("div")
+    iconElement.className = "text-3xl mb-2"
+    iconElement.textContent = prize.icon || "🎁"
+    
+    const nameElement = document.createElement("div")
+    nameElement.className = "text-sm font-semibold text-center"
+    nameElement.textContent = prize.name
+    
+    const costElement = document.createElement("div")
+    costElement.className = "text-xs text-purple-300"
+    costElement.textContent = `${prize.cost} 💎`
+    
+    prizeElement.appendChild(iconElement)
+    prizeElement.appendChild(nameElement)
+    prizeElement.appendChild(costElement)
+    
     prizeScroll.appendChild(prizeElement)
-    // Добавляем лог для проверки вычисленной ширины элемента сразу после добавления в DOM
-    console.log(
-      `DEBUG: Rendered prize element width for ${rewardValue} 💎 (at index ${i}): ${prizeElement.offsetWidth}px (offsetWidth), ${prizeElement.getBoundingClientRect().width}px (getBoundingClientRect().width)`,
-    )
-  }
-  // Добавляем лог для проверки вычисленной ширины элемента
-  if (prizeScroll.firstElementChild) {
-    const computedStyle = window.getComputedStyle(prizeScroll.firstElementChild)
-    console.log("DEBUG: Computed prize element width (from getComputedStyle):", computedStyle.width)
-  }
-  return targetWinningIndex // Возвращаем индекс, чтобы spinPrizes знал, куда целиться
-}
-
-function renderCases() {
-  const casesGrid = document.getElementById("casesGrid")
-  casesGrid.innerHTML = ""
-
-  if (cases.length === 0) {
-    casesGrid.innerHTML = '<div class="col-span-2 text-center text-gray-400 py-8">Нет доступных кейсов</div>'
-    console.log("DEBUG: No cases to render, displaying 'Нет доступных кейсов'.")
-    return
-  }
-
-  console.log(`DEBUG: Attempting to render ${cases.length} cases.`)
-
-  cases.forEach((caseItem) => {
-    const canAfford = userFantics >= caseItem.cost
-
-    const caseElement = document.createElement("div")
-    caseElement.className = `cursor-pointer transition-all duration-300 hover-scale bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-4 text-center ${
-      canAfford
-        ? "hover:shadow-xl hover:shadow-purple-500/20 hover:border-purple-500/50"
-        : "opacity-50 cursor-not-allowed"
-    }`
-
-    const icons = {
-      1: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 7h-9a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2z"></path></svg>`,
-      2: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path></svg>`,
-      3: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3h12l4 6-10 13L2 9z"></path></svg>`,
-    }
-
-    const colors = {
-      1: "bg-gradient-to-br from-gray-600 to-gray-800",
-      2: "bg-gradient-to-br from-purple-400 to-purple-600",
-      3: "bg-gradient-to-br from-purple-600 to-purple-800",
-    }
-
-    caseElement.innerHTML = `
-    <div class="w-16 h-16 rounded-xl ${colors[caseItem.id] || colors[1]} flex items-center justify-center mb-3 mx-auto shadow-lg border border-white/10">
-        <div class="w-8 h-8 text-white">${icons[caseItem.id] || icons[1]}</div>
-    </div>
-    <h3 class="font-semibold text-white text-sm mb-2 leading-tight">${caseItem.name}</h3>
-    <div class="flex items-center justify-center gap-1">
-        <span class="text-purple-400">💎</span>
-        <span class="font-bold text-sm ${canAfford ? "text-gray-200" : "text-gray-500"}">${caseItem.cost.toLocaleString()}</span>
-    </div>
-    ${!canAfford ? '<div class="mt-2"><span class="text-xs text-red-400 font-medium">Недостаточно фантиков</span></div>' : ""}
-`
-
-    if (canAfford) {
-      caseElement.addEventListener("click", () => openCasePage(caseItem))
-    }
-
-    casesGrid.appendChild(caseElement)
-    console.log(`DEBUG: Appended case: ${caseItem.name}`)
   })
-  console.log(`DEBUG: Total children in casesGrid after rendering: ${casesGrid.children.length}`)
 }
 
+// Функция для рендеринга кейсов
+function renderCases(cases) {
+  const casesGrid = document.getElementById("casesGrid")
+  if (!casesGrid) return
+  
+  casesGrid.innerHTML = ""
+  
+  cases.forEach((caseData) => {
+    const caseElement = document.createElement("div")
+    caseElement.className = "bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg p-4 text-white shadow-lg border border-purple-500/30 cursor-pointer hover:from-purple-700 hover:to-purple-900 transition-all"
+    
+    caseElement.innerHTML = `
+      <div class="text-center">
+        <div class="text-3xl mb-2">${caseData.icon || "📦"}</div>
+        <h3 class="font-bold text-lg mb-2">${caseData.name}</h3>
+        <p class="text-sm text-purple-200 mb-3">${caseData.description}</p>
+        <div class="flex items-center justify-center gap-2">
+          <span class="text-purple-300">${caseData.cost}</span>
+          <span class="text-xl">💎</span>
+        </div>
+      </div>
+    `
+    
+    caseElement.addEventListener("click", () => openCasePage(caseData))
+    casesGrid.appendChild(caseElement)
+  })
+}
+
+// Функция для рендеринга возможных призов
 function renderPossiblePrizes(caseData) {
   const possiblePrizes = document.getElementById("possiblePrizes")
+  if (!possiblePrizes || !caseData?.possible_prizes) return
+  
   possiblePrizes.innerHTML = ""
-
-  caseData.presents.forEach((present) => {
-    // Используем caseData.presents напрямую
+  
+  caseData.possible_prizes.forEach((prize) => {
     const prizeElement = document.createElement("div")
-
-    let colorClass = "bg-gradient-to-br from-gray-700 to-gray-900"
-    if (present.cost >= 5000) colorClass = "bg-gradient-to-br from-purple-600 to-purple-800"
-    else if (present.cost >= 2000) colorClass = "bg-gradient-to-br from-purple-700 to-purple-800"
-    else if (present.cost >= 1000) colorClass = "bg-gradient-to-br from-purple-800 to-purple-900"
-    else if (present.cost >= 500) colorClass = "bg-gradient-to-br from-gray-500 to-gray-700"
-
-    prizeElement.className = `${colorClass} rounded-lg p-3 text-center text-white font-semibold text-sm shadow-lg border border-white/20`
+    prizeElement.className = "bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg p-3 text-white text-center shadow-lg border border-purple-500/30"
+    
     prizeElement.innerHTML = `
-    <div class="font-bold">${present.cost} 💎</div>
-    <div class="text-xs opacity-75">${present.probability}%</div>
-`
+      <div class="text-2xl mb-1">${prize.icon || "🎁"}</div>
+      <div class="text-xs font-semibold">${prize.name}</div>
+      <div class="text-xs text-purple-300">${prize.cost} 💎</div>
+    `
+    
     possiblePrizes.appendChild(prizeElement)
   })
 }
 
+// Функция для рендеринга вариантов пополнения
 function renderDepositAmounts() {
-  const depositAmountsContainer = document.getElementById("depositAmounts")
-  depositAmountsContainer.innerHTML = ""
-
-  depositAmounts.forEach((item) => {
+  const depositAmounts = document.getElementById("depositAmounts")
+  if (!depositAmounts) return
+  
+  const amounts = [100, 500, 1000, 2000, 5000, 10000]
+  
+  depositAmounts.innerHTML = ""
+  
+  amounts.forEach((amount) => {
     const amountElement = document.createElement("div")
-    amountElement.className = `cursor-pointer transition-all duration-300 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-4 text-center hover:border-purple-500/50 hover:bg-gray-700/50 ${
-      item.popular ? "ring-2 ring-purple-500 bg-purple-900/20" : ""
-    }`
-
-    const totalAmount = item.amount + item.bonus
-
+    amountElement.className = "bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg p-4 text-white text-center cursor-pointer hover:from-purple-700 hover:to-purple-900 transition-all border border-purple-500/30"
+    
     amountElement.innerHTML = `
-    ${item.popular ? '<div class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full mb-2 inline-block">ПОПУЛЯРНО</div>' : ""}
-    <div class="text-white font-bold text-lg">${item.amount} 💎</div>
-    ${item.bonus > 0 ? `<div class="text-purple-400 text-sm">+${item.bonus} бонус</div>` : ""}
-    ${item.bonus > 0 ? `<div class="text-gray-400 text-xs">Итого: ${totalAmount} 💎</div>` : ""}
-`
-
-    amountElement.addEventListener("click", (e) => selectDepositAmount(item, e))
-    depositAmountsContainer.appendChild(amountElement)
+      <div class="text-2xl mb-1">💎</div>
+      <div class="font-bold text-lg">${amount}</div>
+      <div class="text-xs text-purple-300">Фантиков</div>
+    `
+    
+    amountElement.addEventListener("click", (event) => selectDepositAmount(amount, event))
+    depositAmounts.appendChild(amountElement)
   })
 }
 
-function selectDepositAmount(item, event) {
-  selectedDepositAmount = item
-  updateDepositButton()
-
+// Функция для выбора суммы пополнения
+function selectDepositAmount(amount, event) {
+  selectedDepositAmount = amount
+  
+  // Убираем выделение со всех элементов
   document.querySelectorAll("#depositAmounts > div").forEach((el) => {
     el.classList.remove("selected-amount", "ring-2", "ring-purple-400")
   })
-
-  if (event && event.target) {
+  
+  // Добавляем выделение к выбранному элементу
+  if (event.target.closest("div")) {
     event.target.closest("div").classList.add("selected-amount", "ring-2", "ring-purple-400")
   }
-
-  document.getElementById("customAmount").value = ""
+  
+  updateDepositButton()
 }
 
+// Функция для обновления кнопки пополнения
 function updateDepositButton() {
   const confirmBtn = document.getElementById("confirmDepositBtn")
-  const btnText = document.getElementById("depositBtnText")
-  const customAmountInput = document.getElementById("customAmount")
-  const depositSummary = document.getElementById("depositSummary")
-
-  let amountToDisplay = 0
-  let bonusToDisplay = 0
-  let totalToDisplay = 0
-
-  if (selectedDepositAmount) {
-    amountToDisplay = selectedDepositAmount.amount
-    bonusToDisplay = selectedDepositAmount.bonus
-    totalToDisplay = amountToDisplay + bonusToDisplay
-  } else {
-    const customAmount = Number.parseInt(customAmountInput.value)
-    if (customAmount && customAmount > 0) {
-      amountToDisplay = customAmount
-      totalToDisplay = customAmount // Для кастомной суммы бонуса нет
-    }
-  }
-
-  if (totalToDisplay > 0) {
-    btnText.textContent = `Пополнить на ${totalToDisplay.toLocaleString()} 💎`
+  const depositBtnText = document.getElementById("depositBtnText")
+  const customAmount = document.getElementById("customAmount")
+  
+  if (!confirmBtn || !depositBtnText) return
+  
+  const amount = selectedDepositAmount || (customAmount ? parseInt(customAmount.value) || 0 : 0)
+  
+  if (amount > 0) {
     confirmBtn.disabled = false
-
-    let summaryText = `Вы собираетесь пополнить: ${amountToDisplay.toLocaleString()} 💎`
-    if (bonusToDisplay > 0) {
-      summaryText += ` (+${bonusToDisplay.toLocaleString()} 💎 бонус)`
-    }
-    summaryText += `. Итого: ${totalToDisplay.toLocaleString()} 💎`
-
-    depositSummary.textContent = summaryText
-    depositSummary.classList.remove("hidden")
+    depositBtnText.textContent = `Пополнить на ${amount} 💎`
   } else {
-    btnText.textContent = "Выберите сумму"
     confirmBtn.disabled = true
-    depositSummary.classList.add("hidden")
-    depositSummary.textContent = ""
+    depositBtnText.textContent = "Выберите сумму"
   }
 }
 
+// Функция для открытия модального окна пополнения
 function openDepositModal() {
   document.getElementById("depositModal").classList.remove("hidden")
+  document.getElementById("modalUserStars").textContent = userFantics
   renderDepositAmounts()
-  updateFanticsDisplay()
-  updateDepositButton() // Обновляем кнопку и сводку при открытии
+  updateDepositButton()
 }
 
+// Функция для закрытия модального окна пополнения
 function closeDepositModal() {
   document.getElementById("depositModal").classList.add("hidden")
   selectedDepositAmount = null
-  document.getElementById("customAmount").value = ""
-  updateDepositButton() // Обновляем кнопку и сводку при закрытии
+  const customAmount = document.getElementById("customAmount")
+  if (customAmount) {
+    customAmount.value = ""
+  }
+  document.querySelectorAll("#depositAmounts > div").forEach((el) => {
+    el.classList.remove("selected-amount", "ring-2", "ring-purple-400")
+  })
 }
 
+// Функция для обработки пополнения
 async function processDeposit() {
-  let amountToDeposit = 0
-
-  if (selectedDepositAmount) {
-    amountToDeposit = selectedDepositAmount.amount + selectedDepositAmount.bonus
-  } else {
-    const customAmount = Number.parseInt(document.getElementById("customAmount").value)
-    if (customAmount && customAmount > 0) {
-      amountToDeposit = customAmount
-    }
-  }
-
-  if (amountToDeposit <= 0) {
-    showNotification("Выберите сумму для пополнения", "error")
+  const amount = selectedDepositAmount || (document.getElementById("customAmount") ? parseInt(document.getElementById("customAmount").value) || 0 : 0)
+  
+  if (amount <= 0) {
+    showNotification("Выберите сумму для пополнения", "warning")
     return
   }
-
-  const confirmBtn = document.getElementById("confirmDepositBtn")
-  const originalText = confirmBtn.innerHTML
-  confirmBtn.innerHTML = '<span class="animate-pulse">Пополняем...</span>'
-  confirmBtn.disabled = true
-
-  try {
-    const success = await addFantics(amountToDeposit)
-
-    if (success) {
-      showNotification(`✅ Запрос на пополнение отправлен! Баланс обновится через несколько секунд.`, "success", 4000)
-      closeDepositModal()
-      renderCases()
-    } else {
-      showNotification("❌ Ошибка при пополнении баланса", "error")
-    }
-  } catch (error) {
-    showNotification("❌ Ошибка при пополнении баланса", "error")
-  } finally {
-    confirmBtn.innerHTML = originalText
-    confirmBtn.disabled = false
+  
+  const success = await addFantics(amount)
+  if (success) {
+    showNotification(`✅ Баланс пополнен на ${amount} фантиков!`, "success")
+    closeDepositModal()
   }
 }
 
+// Функция для открытия страницы кейса
 function openCasePage(caseData) {
   currentCase = caseData
   document.getElementById("mainPage").classList.add("hidden")
   document.getElementById("casePage").classList.remove("hidden")
-
+  
   document.getElementById("caseTitle").textContent = caseData.name
-  updateOpenButton()
-
+  document.getElementById("userStarsCase").textContent = userFantics
+  
+  renderPrizeScroll(caseData, 0)
   renderPossiblePrizes(caseData)
+  updateOpenButton()
 }
 
+// Функция для анимации вращения призов
 async function spinPrizes() {
   if (isSpinning) return
-
-  const demoMode = document.getElementById("demoMode").checked
-  const prizeScroll = document.getElementById("prizeScroll")
+  
   const openBtn = document.getElementById("openCaseBtn")
-  const openBtnText = document.getElementById("openBtnText")
-
-  if (!demoMode && userFantics < currentCase.cost) {
-    showNotification("Недостаточно фантиков!", "error")
+  const demoMode = document.getElementById("demoMode")
+  
+  if (!openBtn || !demoMode) return
+  
+  // Проверяем, достаточно ли фантиков (если не демо режим)
+  if (!demoMode.checked && userFantics < (currentCase?.cost || 0)) {
+    showNotification("Недостаточно фантиков для открытия кейса", "warning")
     return
   }
-
+  
   isSpinning = true
   openBtn.disabled = true
-  openBtnText.textContent = "Открываем..."
   openBtn.classList.add("animate-pulse")
-
-  const initialBalanceBeforeSpin = userFantics // Сохраняем баланс до начала операции
-
-  let winningElement = null // Объявляем здесь, чтобы был доступен в finally
-  let animationFrameId // Для отслеживания requestAnimationFrame
-  let animation // Объявляем здесь, чтобы был доступен в monitorAnimation
-
-  // --- START: CRITICAL RESET FOR ANIMATION CONSISTENCY (Moved and enhanced) ---
-  // Cancel any existing animations on the prizeScroll element
-  if (prizeScroll.getAnimations) {
-    prizeScroll.getAnimations().forEach((anim) => anim.cancel())
-    console.log("DEBUG: Cancelled all previous animations on prizeScroll.")
-  }
-  // --- END: CRITICAL RESET FOR ANIMATION CONSISTENCY ---
-
+  
   try {
-    let result = null
-    if (!demoMode) {
-      // 1. Списываем стоимость кейса с UI сразу
-      userFantics -= currentCase.cost
-      updateFanticsDisplay()
-      console.log("DEBUG: Баланс после списания стоимости кейса (UI):", userFantics)
-
-      // Вызываем API для открытия кейса (сервер сам обработает списание и добавление)
-      result = await openCaseAPI(currentCase.id)
-      console.log("DEBUG: Результат от openCaseAPI:", result)
-      console.log("DEBUG: Фактический выигрыш от сервера (result.gift):", result.gift)
-    } else {
-      const possibleRewards = currentCase.presents // Используем currentCase.presents
-      const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)]
-      result = { gift: randomReward.cost, profit: randomReward.cost - currentCase.cost }
-      // Для демо-режима также симулируем немедленное списание для визуальной консистентности
-      userFantics -= currentCase.cost
-      updateFanticsDisplay()
-      console.log("DEBUG: Баланс после списания стоимости кейса (Демо):", userFantics)
-      console.log("DEBUG: Симулированный выигрыш (Демо):", result.gift)
+    // Открываем кейс через API
+    const result = await openCaseAPI(currentCase.id)
+    
+    if (!result) {
+      throw new Error("Не удалось открыть кейс")
     }
-
-    // Теперь, когда мы знаем выигрышный приз, генерируем ленту
-    const targetWinningIndex = renderPrizeScroll(currentCase, result.gift)
-    winningElement = prizeScroll.children[targetWinningIndex] // Присваиваем winningElement
-
-    // --- NEW: Explicitly reset transform AFTER rendering new elements ---
-    prizeScroll.style.transition = "none" // Remove any transition
-    prizeScroll.style.transform = "translateX(0px)" // Reset to initial position
-    prizeScroll.offsetHeight // Force reflow to apply style changes immediately
-    await new Promise((resolve) => requestAnimationFrame(resolve)) // Wait for next frame
-    console.log("DEBUG: prizeScroll reset to translateX(0px) after renderPrizeScroll and before offset calculation.")
-    // --- END NEW ---
-
-    if (!winningElement) {
-      console.error("ERROR: Winning element not found at target index:", targetWinningIndex)
-      throw new Error("Winning element not found.")
-    }
-    console.log(
-      "DEBUG: Winning element identified (before animation):",
-      winningElement.textContent,
-      "at index",
-      targetWinningIndex,
-    )
-
-    const viewport = prizeScroll.parentElement
-    const viewportWidth = viewport.offsetWidth
-
-    // ИСПРАВЛЕНО: Принудительно устанавливаем itemWidth в 80px
-    const itemWidth = 80
-    console.log("DEBUG: Hardcoded itemWidth for animation calculations:", itemWidth)
-
-    // ИСПОЛЬЗУЕМ ФИКСИРОВАННОЕ ЗНАЧЕНИЕ GAP, ТАК КАК getComputedStyle МОЖЕТ БЫТЬ НЕНАДЕЖНЫМ
-    const gapValue = 16 // Tailwind's gap-4 is 16px
-    const effectiveItemWidth = itemWidth + gapValue
-    console.log("DEBUG: Effective item width (calculated):", effectiveItemWidth)
-
-    // Calculate the final desired translateX to center the winning element
-    // This is the exact translateX value needed for the winning prize to be centered.
-    const finalCenteredTranslateX = -(winningElement.offsetLeft + itemWidth / 2 - viewportWidth / 2)
-    console.log("DEBUG: finalCenteredTranslateX (desired end position):", finalCenteredTranslateX)
-
-    // Calculate the total distance for "spinning" effect
-    // Уменьшаем количество "лишних" прокручиваемых элементов
-    const overshootItems = 30 // Прокручиваем на 30 элементов дальше, чем нужно, затем замедляемся
-    const spinDistance = overshootItems * effectiveItemWidth
-    console.log("DEBUG: spinDistance (extra for animation):", spinDistance)
-
-    // The animation's target translateX will be the finalCenteredTranslateX MINUS the spinDistance.
-    // This makes the animation go further left than the final snap point, creating the spin.
-    const animationTargetTranslateX = finalCenteredTranslateX - spinDistance
-    console.log("DEBUG: animationTargetTranslateX (animation's final point):", animationTargetTranslateX)
-
-    animation = prizeScroll.animate(
-      [
-        { transform: "translateX(0px)" }, // Start from current position (0)
-        { transform: `translateX(${animationTargetTranslateX}px)` }, // Animate to this far left point
-      ],
-      {
-        duration: 10000, // УВЕЛИЧЕНА ДЛИТЕЛЬНОСТЬ ДО 10 СЕКУНД
-        easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Smooth deceleration
-        fill: "forwards",
-      },
-    )
-
-    // === НАЧАЛО МОНИТОРИНГА АНИМАЦИИ ===
-    const logInterval = 100 // Логировать каждые 100 мс
-    let lastLogTime = 0
-
-    const monitorAnimation = (currentTime) => {
-      if (!isSpinning || animation.playState === "finished") {
-        // Остановить мониторинг, если спин завершен или анимация завершена
-        cancelAnimationFrame(animationFrameId)
-        return
-      }
-
-      if (currentTime - lastLogTime > logInterval) {
-        lastLogTime = currentTime
-
-        // Получаем текущий прогресс анимации
-        const animationProgress = animation.currentTime / animation.effect.getComputedTiming().duration
-        // Вычисляем текущий translateX на основе прогресса и animationTargetTranslateX
-        const currentTranslateX = animationProgress * animationTargetTranslateX
-
-        const winningElementRect = winningElement.getBoundingClientRect()
-        const viewportRect = viewport.getBoundingClientRect()
-
-        // Позиция центра выигрышного элемента относительно левого края viewport
-        const currentWinningElementCenterInViewport =
-          winningElementRect.left + winningElementRect.width / 2 - viewportRect.left
-
-        const desiredViewportCenter = viewportRect.width / 2
-        const distanceToCenter = currentWinningElementCenterInViewport - desiredViewportCenter
-
-        console.log(
-          `DEBUG: Анимация - Приз ${winningElement.textContent} | Прогресс: ${(animationProgress * 100).toFixed(2)}% | Расчетный translateX: ${currentTranslateX.toFixed(2)}px | Расстояние до центра: ${distanceToCenter.toFixed(2)}px`,
-        )
-      }
-
-      animationFrameId = requestAnimationFrame(monitorAnimation)
-    }
-
-    animationFrameId = requestAnimationFrame(monitorAnimation)
-    // === КОНЕЦ МОНИТОРИНГА АНИМАЦИИ ===
-
-    // Ждем точного завершения анимации
-    await animation.finished
-    console.log("DEBUG: Основная анимация завершена (WAAPI).")
-    console.log("DEBUG: Element at final centered position (after animation):", winningElement.textContent)
-
-    // Подсвечиваем выигрышный элемент
-    if (winningElement) {
-      winningElement.classList.add("winning-prize")
-      console.log("DEBUG: Визуально выделенный приз (из DOM):", winningElement.textContent)
-      console.log("DEBUG: Ожидаемый выигрышный приз (из API):", result.gift)
-      console.log(
-        `DEBUG: Сравнение: Выигрыш от сервера: ${result.gift}, Текст элемента: ${Number.parseInt(winningElement.textContent)}`,
-      ) // Добавлено для прямого сравнения
-      showNotification(`🎉 Вы выиграли ${result.gift} 💎!`, "success", 3000)
-    }
-
-    // === НАЧАЛО ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ (SNAP CORRECTION) ===
-    try {
-      const viewport = prizeScroll.parentElement
-      const viewportWidth = viewport.offsetWidth
-
-      // desiredTranslateXForCentering уже равен finalCenteredTranslateX
-      const desiredTranslateXForCentering = finalCenteredTranslateX
-
-      const currentTransformStyle = window.getComputedStyle(prizeScroll).transform
-      let actualCurrentTranslateX = 0
-
-      console.log("DEBUG: Snap Correction - Raw transform style:", currentTransformStyle)
-      console.log(
-        "DEBUG: Snap Correction - winningElement.getBoundingClientRect().width (at snap):",
-        winningElement.getBoundingClientRect().width,
-      )
-      console.log("DEBUG: Snap Correction - winningElement.offsetWidth (at snap):", winningElement.offsetWidth)
-      console.log("DEBUG: Snap Correction - prizeScroll.getBoundingClientRect():", prizeScroll.getBoundingClientRect())
-
-      // ИСПРАВЛЕНО: Corrected regex for matrix parsing
-      const matrixRegex = /matrix$$([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)$$/
-      const matrixMatch = currentTransformStyle.match(matrixRegex)
-
-      if (matrixMatch && matrixMatch.length >= 7) {
-        console.log("DEBUG: Snap Correction - matrixMatch found:", matrixMatch)
-        console.log("DEBUG: Snap Correction - matrixMatch[5] (translateX):", matrixMatch[5]) // tx is the 5th capturing group (index 5)
-        actualCurrentTranslateX = Number.parseFloat(matrixMatch[5]) // tx value
-      } else {
-        // ИСПРАВЛЕНО: Corrected regex for translateX parsing
-        const translateXMatch = currentTransformStyle.match(/translateX$$(-?\d+\.?\d*)px$$/)
-        if (translateXMatch && translateXMatch[1]) {
-          actualCurrentTranslateX = Number.parseFloat(translateXMatch[1])
-        } else {
-          console.warn(
-            "WARNING: Snap Correction - Could not parse transform style, unexpected format:",
-            currentTransformStyle,
-          )
-          // In case of parsing failure, use the assumed final position from animation
-          actualCurrentTranslateX = animationTargetTranslateX
+    
+    // Обновляем баланс
+    userFantics = result.new_balance || userFantics
+    updateFanticsDisplay()
+    
+    // Анимация вращения
+    const prizeScroll = document.getElementById("prizeScroll")
+    if (prizeScroll) {
+      const scrollWidth = prizeScroll.scrollWidth
+      const containerWidth = prizeScroll.parentElement.offsetWidth
+      const centerPosition = scrollWidth / 2 - containerWidth / 2
+      
+      // Находим выигрышный приз
+      const winningPrize = result.prize
+      let targetPosition = centerPosition
+      
+      if (winningPrize) {
+        // Ищем элемент с выигрышным призом
+        const prizeElements = prizeScroll.children
+        for (let i = 0; i < prizeElements.length; i++) {
+          const prizeElement = prizeElements[i]
+          const prizeName = prizeElement.querySelector("div:nth-child(2)")?.textContent
+          if (prizeName === winningPrize.name) {
+            targetPosition = centerPosition + (i * 128) // 128px - ширина элемента приза
+            break
+          }
         }
       }
-
-      // Вычисляем разницу между фактическим текущим положением и желаемым центрированным положением
-      const adjustmentNeeded = desiredTranslateXForCentering - actualCurrentTranslateX
-
-      console.log("DEBUG: Snap Correction - winningElement.offsetLeft:", winningElement.offsetLeft)
-      console.log("DEBUG: Snap Correction - viewportWidth:", viewportWidth)
-      console.log("DEBUG: Snap Correction - desiredTranslateXForCentering:", desiredTranslateXForCentering)
-      console.log("DEBUG: Snap Correction - actualCurrentTranslateX (from style):", actualCurrentTranslateX)
-      console.log("DEBUG: Snap Correction - adjustmentNeeded:", adjustmentNeeded)
-
-      // Применяем коррекцию, если отклонение значительное (например, более 0.5px)
-      if (Math.abs(adjustmentNeeded) > 0.5) {
-        prizeScroll.style.transition = "transform 0.3s ease-out" // Плавный переход для подгонки
-        prizeScroll.style.transform = `translateX(${desiredTranslateXForCentering}px)`
-        console.log(
-          "DEBUG: Snap Correction - Applied adjustment to exact desired position:",
-          desiredTranslateXForCentering,
-        )
-        await new Promise((resolve) => setTimeout(resolve, 300)) // Ждем завершения коррекции
-      } else {
-        console.log("DEBUG: Snap Correction - adjustment not needed, offset is minimal:", adjustmentNeeded)
-      }
-      console.log("DEBUG: Element at final snapped position (after correction):", winningElement.textContent)
-    } catch (snapError) {
-      console.error("ERROR: Ошибка в логике подгонки (snap correction):", snapError)
-      showNotification("⚠️ Ошибка анимации. Попробуйте еще раз.", "error")
-    }
-    // === КОНЕЦ ПОСТ-АНИМАЦИОННОЙ ПОДГОНКИ ===
-
-    // 2. Добавляем сумму выигрыша к балансу после анимации (UI)
-    if (!demoMode) {
-      userFantics += result.gift // Добавляем фактическую сумму выигрыша
-      updateFanticsDisplay()
-      console.log("DEBUG: Баланс после добавления выигрыша (UI):", userFantics)
-    } else {
-      userFantics += result.gift // Для демо-режима тоже
-      updateFanticsDisplay()
-      console.log("DEBUG: Баланс после добавления выигрыша (Демо):", userFantics)
-    }
-
-    // === НАЧАЛО ИЗМЕНЕНИЙ ДЛЯ ПОЛЛИНГА ===
-    const expectedBalance = initialBalanceBeforeSpin - currentCase.cost + result.gift
-    const maxRetries = 10
-    const retryInterval = 1000
-
-    console.log(`DEBUG: Ожидаемый баланс после транзакции: ${expectedBalance}`)
-    showConnectionStatus("Синхронизация баланса...")
-
-    let currentRetries = 0
-    let balanceSynced = false
-
-    try {
-      while (!balanceSynced && currentRetries < maxRetries) {
-        console.log(`DEBUG: Попытка синхронизации баланса #${currentRetries + 1}`)
-        const fetchedBalance = await fetchUserFantics()
-        if (fetchedBalance !== null && fetchedBalance === expectedBalance) {
-          balanceSynced = true
-          console.log("✅ Баланс успешно синхронизирован с сервером.")
-          showConnectionStatus("Баланс синхронизирован!")
+      
+      // Анимация прокрутки
+      const startTime = performance.now()
+      const duration = 3000
+      const startPosition = prizeScroll.scrollLeft
+      
+      const animateScroll = (currentTime) => {
+        const elapsed = currentTime - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        
+        // Функция плавности (ease-out)
+        const easeOut = 1 - Math.pow(1 - progress, 3)
+        
+        prizeScroll.scrollLeft = startPosition + (targetPosition - startPosition) * easeOut
+        
+        if (progress < 1) {
+          requestAnimationFrame(animateScroll)
         } else {
-          console.log(
-            `DEBUG: Баланс не совпадает. Ожидаем: ${expectedBalance}, Получено: ${fetchedBalance}. Повторная попытка через ${retryInterval}ms.`,
-          )
-          await new Promise((resolve) => setTimeout(resolve, retryInterval))
-          currentRetries++
+          // Показываем результат
+          setTimeout(() => {
+            showNotification(
+              `🎉 Поздравляем! Вы выиграли ${winningPrize?.name || "приз"}!`,
+              "success",
+              5000
+            )
+            
+            // Сбрасываем состояние
+            openBtn.disabled = false
+            openBtn.classList.remove("animate-pulse")
+            updateOpenButton()
+            isSpinning = false
+          }, 500)
         }
       }
-
-      if (!balanceSynced) {
-        showNotification(
-          "⚠️ Не удалось синхронизировать баланс с сервером. Попробуйте обновить приложение.",
-          "error",
-          8000,
-        )
-        console.error("❌ Не удалось синхронизировать баланс после нескольких попыток.")
-        showConnectionStatus("Ошибка синхронизации баланса", true)
-      }
-    } catch (pollingError) {
-      console.error("ERROR: Ошибка в цикле поллинга баланса:", pollingError)
-      showNotification("⚠️ Ошибка синхронизации баланса. Попробуйте обновить приложение.", "error", 8000)
-      showConnectionStatus("Ошибка синхронизации баланса", true)
+      
+      requestAnimationFrame(animateScroll)
     }
-    // === КОНЕЦ ИЗМЕНЕНИЙ ДЛЯ ПОЛЛИНГА ===
-
-    // Ждем завершения свечения приза
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    console.log("DEBUG: Свечение приза завершено.")
   } catch (error) {
-    showNotification(`❌ Ошибка: ${error.message}`, "error")
-    // В случае ошибки, если было оптимистичное списание, возвращаем баланс
-    if (!demoMode && initialBalanceBeforeSpin !== userFantics) {
-      userFantics = initialBalanceBeforeSpin // Возвращаем к начальному состоянию
-      updateFanticsDisplay()
-      console.log("DEBUG: Баланс восстановлен после ошибки:", userFantics)
-    }
-    // Всегда пытаемся получить актуальный баланс с сервера в случае ошибки
-    await fetchUserFantics()
-    console.error("DEBUG: Общая ошибка в spinPrizes:", error)
-  } finally {
-    // Этот блок всегда выполняется, независимо от ошибок, для сброса UI
-    if (winningElement) {
-      winningElement.classList.remove("winning-prize")
-    }
-    // Отменяем мониторинг анимации
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId)
-    }
-    // Перегенерируем для следующего спина, чтобы лента была "свежей"
-    // Это также сбросит transform, так как innerHTML будет заменен
-    renderPrizeScroll(currentCase, 0)
-
+    console.error("❌ Ошибка при открытии кейса:", error)
+    showNotification("❌ Ошибка при открытии кейса", "error")
+    
+    // Сбрасываем состояние
     openBtn.disabled = false
     openBtn.classList.remove("animate-pulse")
     updateOpenButton()
     isSpinning = false
-    console.log("DEBUG: UI сброшен, кнопка активна.")
   }
 }
 
-// --- NEW: TON Connect Integration — c TON PROOF ---
-const connector = new TonConnect({
-  manifestUrl: "https://mtkache09.github.io/telegram-stars-case/manifest.json",
-  // storage опционально
-});
-
-async function connectTonWallet() {
-  if (isSpinning) {
-    showNotification("Подождите, пока завершится текущая операция.", "info");
-    return;
-  }
-
-  const connectBtn = document.getElementById("connectTonWalletBtn");
-  connectBtn.disabled = true;
-  const originalBtnText = connectBtn.innerHTML;
-  connectBtn.innerHTML = '<span class="animate-pulse">Подключение...</span>';
-
+// Инициализация TON Connect UI
+async function initTonConnect() {
   try {
-    // === 1. Генерируем payload для TON Proof (лучше получить с backend, можно Date.now или crypto.randomUUID)
-    const tonProofPayload = Date.now().toString();
-
-    // === 2. Вызов TON Connect с TON Proof
-    const { universalLink, tonProof } = await connector.connect({
-      tonProof: tonProofPayload
-    });
-
-    // 3. Для пользователя: открываем ссылку с universal link
-    window.open(universalLink, "_blank");
-
-    // 4. Подписываемся на результат коннекта
-    const unsubscribe = connector.onStatusChange(async (wallet) => {
-      connectBtn.innerHTML = originalBtnText;
-      connectBtn.disabled = false;
-
-      if (wallet) {
-        unsubscribe();
-        const walletAddress = wallet.account.address;
-        const userId = getUserId();
-
-        // Получаем proof-данные (если есть)
-        const proofObj = tonProof && tonProof.proof ? tonProof.proof : null;
-        const publicKey = proofObj && proofObj.pubkey ? proofObj.pubkey : null;
-
-        // Формируем JSON для backend
-        const body = {
-          user_id: userId,
-          wallet_address: walletAddress,
-          proof: proofObj || undefined,
-          public_key: publicKey || undefined
-        };
-
-        // Отправляем на сервер
-        try {
-          const response = await fetch(`${API_BASE}/ton/connect`, {
-            method: "POST",
-            headers: {
-              ...getAuthHeaders(),
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(body),
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            console.log("DEBUG: Backend response for TON connect:", data);
-            showNotification("✅ Адрес TON кошелька сохранен на сервере!", "success", 3000);
-          } else {
-            const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
-            console.error("❌ Ошибка сохранения TON кошелька на сервере:", response.status, errorData)
-            showNotification(
-              `❌ Ошибка сохранения TON кошелька: ${errorData.detail || "Неизвестная ошибка"}`,
-              "error",
-              5000,
-            )
-          }
-        } catch (backendError) {
-          console.error("❌ Ошибка при отправке TON кошелька на сервер:", backendError);
-          showNotification("❌ Ошибка сети при сохранении TON кошелька.", "error", 5000);
-        }
+    console.log("🔄 Инициализация TON Connect UI...")
+    
+    // Используем правильный URL для manifest
+    const manifestUrl = "https://mtkache09.github.io/telegram-stars-case/tonconnect-manifest.json"
+    
+    console.log("Manifest URL:", manifestUrl)
+    
+    // Проверяем доступность manifest
+    const manifestResponse = await fetch(manifestUrl)
+    if (!manifestResponse.ok) {
+      throw new Error(`Manifest не доступен: ${manifestResponse.status} ${manifestResponse.statusText}`)
+    }
+    
+    const manifest = await manifestResponse.json()
+    console.log("Manifest загружен успешно:", manifest)
+    
+    // Инициализируем TON Connect UI
+    tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: manifestUrl,
+      buttonRootId: "ton-connect-ui"
+    })
+    
+    // Слушаем изменения статуса кошелька
+    tonConnectUI.onStatusChange(wallet => {
+      console.log("Статус кошелька изменился:", wallet)
+      if (wallet && wallet.account) {
+        processWalletConnection(wallet)
       } else {
-        console.log("DEBUG: TON Wallet disconnected or connection failed.");
-        showNotification("⚠️ Подключение TON кошелька отменено или не удалось.", "info", 3000);
+        // Кошелек отключен
+        walletData = null
+        const connectBtn = document.getElementById("connectTonWalletBtn")
+        if (connectBtn) {
+          connectBtn.disabled = false
+          connectBtn.innerHTML = `
+            <svg class="w-5 h-5 mr-2 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"></path>
+              <path d="M12 6v6l4 2"></path>
+            </svg>
+            Подключить TON Кошелек
+          `
+        }
+        showNotification("⚠️ TON кошелек отключен", "info", 3000)
       }
-    });
+    })
+    
+    // Проверяем, подключен ли кошелек
+    const wallet = tonConnectUI.wallet
+    if (wallet && wallet.account) {
+      processWalletConnection(wallet)
+    }
+    
+    console.log("✅ TON Connect UI инициализирован")
+    
   } catch (error) {
-    console.error("❌ Ошибка при инициализации TON Connect:", error)
+    console.error("❌ Ошибка инициализации TON Connect:", error)
     showNotification(`❌ Ошибка TON Connect: ${error.message}`, "error", 5000)
-    connectBtn.innerHTML = originalBtnText
-    connectBtn.disabled = false
   }
-}// --- END: NEW TON Connect Integration ---
+}
 
+// Обработка подключения кошелька
+async function processWalletConnection(wallet) {
+  try {
+    if (!wallet.account) {
+      throw new Error("Аккаунт кошелька недоступен")
+    }
+    
+    walletData = {
+      wallet_address: wallet.account.address,
+      user_id: getUserId(),
+      network: wallet.account.chain,
+      public_key: wallet.account.publicKey
+    }
+    
+    // Добавляем proof данные, если доступны
+    if (wallet.proof) {
+      walletData.proof = {
+        timestamp: wallet.proof.timestamp,
+        domain: {
+          lengthBytes: wallet.proof.domain.lengthBytes,
+          value: wallet.proof.domain.value
+        },
+        signature: wallet.proof.signature,
+        payload: wallet.proof.payload,
+        pubkey: wallet.proof.pubkey || wallet.account.publicKey
+      }
+    }
+    
+    // Обновляем кнопку
+    const connectBtn = document.getElementById("connectTonWalletBtn")
+    if (connectBtn) {
+      connectBtn.disabled = true
+      connectBtn.innerHTML = `
+        <svg class="w-5 h-5 mr-2 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"></path>
+          <path d="M12 6v6l4 2"></path>
+        </svg>
+        ✅ Подключен
+      `
+    }
+    
+    // Отправляем данные на сервер
+    await sendWalletToBackend()
+    
+  } catch (error) {
+    console.error("❌ Ошибка обработки подключения кошелька:", error)
+    showNotification(`❌ Ошибка подключения кошелька: ${error.message}`, "error", 5000)
+  }
+}
+
+// Отправка данных кошелька на сервер
+async function sendWalletToBackend() {
+  if (!walletData) {
+    showNotification("Нет данных кошелька для отправки", "warning")
+    return
+  }
+  
+  try {
+    console.log("🔄 Отправка данных кошелька на сервер...")
+    
+    const response = await fetch(`${API_BASE}/ton/connect`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(walletData)
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      console.log("✅ Данные кошелька отправлены успешно:", data)
+      showNotification("✅ TON кошелек подключен и сохранен!", "success", 3000)
+    } else {
+      const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
+      console.error("❌ Ошибка отправки данных кошелька:", response.status, errorData)
+      showNotification(
+        `❌ Ошибка сохранения кошелька: ${errorData.detail || "Неизвестная ошибка"}`,
+        "error",
+        5000
+      )
+    }
+  } catch (error) {
+    console.error("❌ Ошибка сети при отправке данных кошелька:", error)
+    showNotification("❌ Ошибка сети при сохранении кошелька", "error", 5000)
+  }
+}
+
+// Функция для возврата назад
 function goBack() {
   document.getElementById("casePage").classList.add("hidden")
   document.getElementById("mainPage").classList.remove("hidden")
@@ -1199,35 +841,36 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
   }
 })
 
-// NEW: Event listener for TON Wallet Connect button
-document.getElementById("connectTonWalletBtn").addEventListener("click", connectTonWallet)
-
+// Инициализация приложения
 async function initApp() {
   console.log("DEBUG: Начало initApp")
   console.log("🚀 Инициализация приложения...")
   console.log("API URL:", API_BASE)
   console.log("Авторизация доступна:", isAuthAvailable() ? "✅ Да" : "❌ Нет")
-
+  
   if (window.Telegram?.WebApp?.initData) {
     console.log("📱 Init Data длина:", window.Telegram.WebApp.initData.length)
     // Показываем первые и последние символы для отладки
     const initData = window.Telegram.WebApp.initData
     console.log("📱 Init Data preview:", initData.substring(0, 50) + "..." + initData.substring(initData.length - 50))
   }
-
+  
   // Показываем предупреждение если нет авторизации
   if (!isAuthAvailable()) {
     showNotification("⚠️ Для полной функциональности откройте в Telegram", "info", 8000)
   }
-
+  
   // Запускаем тест соединения для отладки
   if (window.location.search.includes("debug=true")) {
     await testConnection()
   }
-
+  
+  // Инициализируем TON Connect
+  await initTonConnect()
+  
   await fetchUserFantics()
   await fetchCases()
-
+  
   console.log("✅ Приложение готово!")
   console.log("DEBUG: Конец initApp")
 }
