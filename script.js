@@ -47,11 +47,13 @@ function getAuthHeaders() {
     initData = window.Telegram.WebApp.initData
     console.log("✅ Используем Telegram WebApp initData")
     console.log("📱 Init Data длина:", initData.length)
+    console.log("📱 Init Data preview:", initData.substring(0, 100) + "...")
   } else if (window.location.search.includes("initData=")) {
     // Для тестирования можно передать initData через URL
     const urlParams = new URLSearchParams(window.location.search)
     initData = urlParams.get("initData")
     console.log("✅ Используем initData из URL параметров")
+    console.log("📱 Init Data preview:", initData.substring(0, 100) + "...")
   }
 
   if (initData) {
@@ -191,7 +193,8 @@ async function fetchUserFantics() {
   try {
     console.log("🔄 Запрос баланса пользователя...")
     
-    const response = await fetch(`${API_BASE}/user/fantics`, {
+    const userId = getUserId()
+    const response = await fetch(`${API_BASE}/fantics/${userId}`, {
       headers: getAuthHeaders(),
     })
     
@@ -240,7 +243,7 @@ async function testConnection() {
   try {
     console.log("🔄 Тестирование соединения с сервером...")
     
-    const response = await fetch(`${API_BASE}/health`, {
+    const response = await fetch(`${API_BASE}/`, {
       headers: getAuthHeaders(),
     })
     
@@ -263,7 +266,7 @@ async function openCaseAPI(caseId) {
   try {
     console.log("🔄 Открытие кейса:", caseId)
     
-    const response = await fetch(`${API_BASE}/cases/${caseId}/open`, {
+    const response = await fetch(`${API_BASE}/open_case/${caseId}`, {
       method: "POST",
       headers: getAuthHeaders(),
     })
@@ -271,6 +274,11 @@ async function openCaseAPI(caseId) {
     if (response.ok) {
       const data = await response.json()
       console.log("✅ Кейс открыт:", data)
+      
+      // Обновляем баланс пользователя
+      userFantics = (userFantics || 0) - data.spent + data.gift
+      updateFanticsDisplay()
+      
       return data
     } else {
       const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
@@ -290,15 +298,22 @@ async function addFantics(amount) {
   try {
     console.log("🔄 Добавление фантиков:", amount)
     
-    const response = await fetch(`${API_BASE}/user/fantics`, {
+    const userId = getUserId()
+    const response = await fetch(`${API_BASE}/fantics/add`, {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ user_id: userId, amount }),
     })
     
     if (response.ok) {
       const data = await response.json()
-      userFantics = data.fantics || 0
+      // Обновляем баланс на основе ответа сервера
+      if (data.fantics !== undefined) {
+        userFantics = data.fantics
+      } else {
+        // Если сервер не возвращает новый баланс, добавляем к текущему
+        userFantics = (userFantics || 0) + amount
+      }
       console.log("✅ Фантики добавлены:", userFantics)
       updateFanticsDisplay()
       return true
@@ -806,12 +821,15 @@ async function sendWalletToBackend() {
     console.log("🔄 Отправка данных кошелька на сервер...")
     console.log("📤 Данные для отправки:", JSON.stringify(walletData, null, 2))
     
+    const headers = {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    }
+    console.log("📤 Заголовки запроса:", headers)
+    
     const response = await fetch(`${API_BASE}/ton/connect`, {
       method: "POST",
-      headers: {
-        ...getAuthHeaders(),
-        "Content-Type": "application/json"
-      },
+      headers: headers,
       body: JSON.stringify(walletData)
     })
     
