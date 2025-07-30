@@ -682,15 +682,33 @@ async function initTonConnect() {
     // Инициализируем TON Connect UI
     tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: manifestUrl,
-      buttonRootId: "ton-connect-ui"
+      buttonRootId: "ton-connect-ui",
+      // Включаем поддержку TON Proof
+      connectRequest: {
+        items: [
+          {
+            name: "ton_addr"
+          },
+          {
+            name: "ton_proof",
+            payload: Date.now().toString() // Простой payload для тестирования
+          }
+        ]
+      }
     })
     
     // Слушаем изменения статуса кошелька
     tonConnectUI.onStatusChange(wallet => {
-      console.log("Статус кошелька изменился:", wallet)
-      if (wallet && wallet.account) {
-        processWalletConnection(wallet)
-      } else {
+          console.log("Статус кошелька изменился:", wallet)
+    if (wallet && wallet.account) {
+      console.log("✅ Кошелек подключен:", {
+        address: wallet.account.address,
+        chain: wallet.account.chain,
+        publicKey: wallet.account.publicKey,
+        hasProof: !!wallet.proof
+      })
+      processWalletConnection(wallet)
+    } else {
         // Кошелек отключен
         walletData = null
         const connectBtn = document.getElementById("connectTonWalletBtn")
@@ -711,6 +729,7 @@ async function initTonConnect() {
     // Проверяем, подключен ли кошелек
     const wallet = tonConnectUI.wallet
     if (wallet && wallet.account) {
+      console.log("🔄 Кошелек уже подключен при инициализации")
       processWalletConnection(wallet)
     }
     
@@ -729,15 +748,17 @@ async function processWalletConnection(wallet) {
       throw new Error("Аккаунт кошелька недоступен")
     }
     
+    // Формируем данные в формате, который ожидает бэкенд
     walletData = {
       wallet_address: wallet.account.address,
       user_id: getUserId(),
-      network: wallet.account.chain,
+      network: wallet.account.chain.toString(), // Преобразуем в строку
       public_key: wallet.account.publicKey
     }
     
     // Добавляем proof данные, если доступны
     if (wallet.proof) {
+      console.log("🔐 TON Proof получен:", wallet.proof)
       walletData.proof = {
         timestamp: wallet.proof.timestamp,
         domain: {
@@ -748,6 +769,8 @@ async function processWalletConnection(wallet) {
         payload: wallet.proof.payload,
         pubkey: wallet.proof.pubkey || wallet.account.publicKey
       }
+    } else {
+      console.log("⚠️ TON Proof не получен")
     }
     
     // Обновляем кнопку
@@ -781,6 +804,7 @@ async function sendWalletToBackend() {
   
   try {
     console.log("🔄 Отправка данных кошелька на сервер...")
+    console.log("📤 Данные для отправки:", JSON.stringify(walletData, null, 2))
     
     const response = await fetch(`${API_BASE}/ton/connect`, {
       method: "POST",
@@ -795,6 +819,18 @@ async function sendWalletToBackend() {
       const data = await response.json()
       console.log("✅ Данные кошелька отправлены успешно:", data)
       showNotification("✅ TON кошелек подключен и сохранен!", "success", 3000)
+      
+      // Обновляем кнопку с информацией о подключенном кошельке
+      const connectBtn = document.getElementById("connectTonWalletBtn")
+      if (connectBtn) {
+        connectBtn.innerHTML = `
+          <svg class="w-5 h-5 mr-2 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"></path>
+            <path d="M12 6v6l4 2"></path>
+          </svg>
+          ✅ ${walletData.wallet_address.substring(0, 6)}...${walletData.wallet_address.substring(walletData.wallet_address.length - 4)}
+        `
+      }
     } else {
       const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
       console.error("❌ Ошибка отправки данных кошелька:", response.status, errorData)
@@ -803,6 +839,12 @@ async function sendWalletToBackend() {
         "error",
         5000
       )
+      
+      // Если ошибка связана с TON Proof, предлагаем попробовать без него
+      if (errorData.detail && errorData.detail.includes("TON Proof")) {
+        console.log("⚠️ TON Proof не прошел проверку, попробуем подключить без него")
+        // Можно добавить логику для повторной попытки без proof
+      }
     }
   } catch (error) {
     console.error("❌ Ошибка сети при отправке данных кошелька:", error)
