@@ -32,6 +32,7 @@ let currentCase = null
 let isSpinning = false
 let userFantics = 0
 let selectedDepositAmount = null
+let topupPayload = null
 
 // Функция для отладочного логирования
 function debugLog(message) {
@@ -925,10 +926,18 @@ document.getElementById("backBtn").addEventListener("click", goBack)
 document.getElementById("openCaseBtn").addEventListener("click", spinPrizes)
 document.getElementById("demoMode").addEventListener("change", updateOpenButton)
 
-// Deposit modal event listeners
-document.getElementById("depositBtn").addEventListener("click", openDepositModal)
-document.getElementById("closeDepositModal").addEventListener("click", closeDepositModal)
-document.getElementById("confirmDepositBtn").addEventListener("click", processDeposit)
+// Topup modal event listeners
+document.getElementById("depositBtn").addEventListener("click", openTopupModal)
+document.getElementById("closeTopupModal").addEventListener("click", closeTopupModal)
+document.getElementById("createTopupPayload").addEventListener("click", createTopupPayload)
+document.getElementById("sendTonTransaction").addEventListener("click", sendTonTransaction)
+
+// Закрытие модального окна при клике вне его
+document.getElementById("topupModal").addEventListener("click", (e) => {
+  if (e.target.id === "topupModal") {
+    closeTopupModal()
+  }
+})
 
 document.getElementById("customAmount").addEventListener("input", () => {
   selectedDepositAmount = null
@@ -948,6 +957,132 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
 function cleanup() {
   // Очистка ресурсов при необходимости
   console.log("🧹 Ресурсы очищены")
+}
+
+// Функции для работы с пополнением счета
+function openTopupModal() {
+  document.getElementById('topupModal').classList.remove('hidden')
+  document.getElementById('topupAmount').value = '1000'
+  document.getElementById('tonPaymentInfo').classList.add('hidden')
+  document.getElementById('createTopupPayload').classList.remove('hidden')
+  document.getElementById('sendTonTransaction').classList.add('hidden')
+}
+
+function closeTopupModal() {
+  document.getElementById('topupModal').classList.add('hidden')
+  topupPayload = null
+}
+
+async function createTopupPayload() {
+  const amount = parseInt(document.getElementById('topupAmount').value)
+  const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value
+  
+  if (!amount || amount < 100) {
+    showNotification('Минимальная сумма пополнения: 100 фантиков', 'error')
+    return
+  }
+  
+  try {
+    const response = await fetch(`${API_BASE}/topup/create_payload`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        amount: amount,
+        payment_method: paymentMethod
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
+    topupPayload = await response.json()
+    
+    // Показываем информацию о платеже
+    document.getElementById('tonAmount').textContent = topupPayload.amount
+    document.getElementById('destinationAddress').textContent = topupPayload.destination
+    document.getElementById('paymentComment').textContent = topupPayload.comment
+    document.getElementById('tonPaymentInfo').classList.remove('hidden')
+    document.getElementById('createTopupPayload').classList.add('hidden')
+    document.getElementById('sendTonTransaction').classList.remove('hidden')
+    
+    showNotification('Платеж создан! Теперь отправьте TON транзакцию', 'success')
+    
+  } catch (error) {
+    console.error('Ошибка создания payload:', error)
+    showNotification('Ошибка создания платежа: ' + error.message, 'error')
+  }
+}
+
+async function sendTonTransaction() {
+  if (!tonConnectUI || !topupPayload) {
+    showNotification('TON Connect не инициализирован или payload не создан', 'error')
+    return
+  }
+  
+  try {
+    // Создаем транзакцию для отправки TON
+    const transaction = {
+      validUntil: Math.floor(Date.now() / 1000) + 600, // 10 минут
+      messages: [
+        {
+          address: topupPayload.destination,
+          amount: (topupPayload.amount * 1000000000).toString(), // Конвертируем в нанотоны
+          payload: topupPayload.payload
+        }
+      ]
+    }
+    
+    // Отправляем транзакцию через TON Connect
+    const result = await tonConnectUI.sendTransaction(transaction)
+    
+    if (result) {
+      showNotification('Транзакция отправлена! Ожидайте подтверждения...', 'success')
+      
+      // Подтверждаем пополнение на бэкенде
+      await confirmTopup()
+      
+    } else {
+      showNotification('Ошибка отправки транзакции', 'error')
+    }
+    
+  } catch (error) {
+    console.error('Ошибка отправки TON транзакции:', error)
+    showNotification('Ошибка отправки транзакции: ' + error.message, 'error')
+  }
+}
+
+async function confirmTopup() {
+  if (!topupPayload) return
+  
+  try {
+    const response = await fetch(`${API_BASE}/topup/confirm`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        amount: parseInt(document.getElementById('topupAmount').value),
+        payment_method: 'ton'
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      showNotification(result.message, 'success')
+      closeTopupModal()
+      await fetchUserFantics() // Обновляем баланс
+    } else {
+      showNotification('Ошибка подтверждения пополнения', 'error')
+    }
+    
+  } catch (error) {
+    console.error('Ошибка подтверждения пополнения:', error)
+    showNotification('Ошибка подтверждения: ' + error.message, 'error')
+  }
 }
 
 // Инициализация приложения
