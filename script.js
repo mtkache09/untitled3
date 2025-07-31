@@ -680,28 +680,18 @@ async function initTonConnect() {
   try {
     console.log("🔄 Инициализация TON Connect UI...")
     
-    // Создаем локальный URL для manifest
-    const manifestBlob = new Blob([JSON.stringify({
-      "url": window.location.origin,
-      "name": "Fantics Casino - Telegram Mini App",
-      "iconUrl": "https://ton.org/download/ton_symbol.png",
-      "termsOfUseUrl": window.location.origin,
-      "privacyPolicyUrl": window.location.origin,
-      "features": ["ton_addr", "ton_proof"],
-      "items": [
-        {
-          "name": "ton_addr",
-          "description": "Request wallet address"
-        },
-        {
-          "name": "ton_proof",
-          "description": "Request TON proof for authentication"
-        }
-      ]
-    })], { type: 'application/json' });
+    // Используем локальный manifest файл
+    const manifestUrl = window.location.origin + "/tonconnect-manifest.json"
+    console.log("Manifest URL:", manifestUrl)
     
-    const manifestUrl = URL.createObjectURL(manifestBlob);
-    console.log("Создан локальный manifest URL:", manifestUrl)
+    // Проверяем доступность manifest
+    const manifestResponse = await fetch(manifestUrl)
+    if (!manifestResponse.ok) {
+      throw new Error(`Manifest недоступен: ${manifestResponse.status} ${manifestResponse.statusText}`)
+    }
+    
+    const manifest = await manifestResponse.json()
+    console.log("Manifest загружен:", manifest)
     
     tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: manifestUrl,
@@ -745,9 +735,6 @@ async function initTonConnect() {
     }
     
     console.log("✅ TON Connect UI инициализирован")
-    
-    // Сохраняем URL для очистки
-    window.manifestUrl = manifestUrl
     
   } catch (error) {
     console.error("❌ Ошибка инициализации TON Connect:", error)
@@ -902,10 +889,8 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
 
 // Функция для очистки ресурсов
 function cleanup() {
-  if (window.manifestUrl) {
-    URL.revokeObjectURL(window.manifestUrl)
-    console.log("🧹 Manifest URL очищен")
-  }
+  // Очистка ресурсов при необходимости
+  console.log("🧹 Ресурсы очищены")
 }
 
 // Инициализация приложения
