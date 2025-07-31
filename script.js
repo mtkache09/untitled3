@@ -680,23 +680,30 @@ async function initTonConnect() {
   try {
     console.log("🔄 Инициализация TON Connect UI...")
     
-    // Используем рабочий manifest URL
-    const manifestUrl = "https://vladimiropaits.github.io/TONConnectTest.github.io/tonconnect-manifest.json"
-    
-    console.log("Manifest URL:", manifestUrl)
-    
-    // Проверяем доступность manifest
-    const manifestResponse = await fetch(manifestUrl)
-    if (!manifestResponse.ok) {
-      throw new Error(`Manifest недоступен: ${manifestResponse.status} ${manifestResponse.statusText}`)
+    // Используем встроенный manifest для избежания проблем с внешними URL
+    const manifest = {
+      "url": window.location.origin,
+      "name": "Fantics Casino - Telegram Mini App",
+      "iconUrl": "https://ton.org/download/ton_symbol.png",
+      "termsOfUseUrl": window.location.origin,
+      "privacyPolicyUrl": window.location.origin,
+      "features": ["ton_addr", "ton_proof"],
+      "items": [
+        {
+          "name": "ton_addr",
+          "description": "Request wallet address"
+        },
+        {
+          "name": "ton_proof",
+          "description": "Request TON proof for authentication"
+        }
+      ]
     }
     
-    const manifest = await manifestResponse.json()
-    console.log("Manifest загружен успешно:", manifest)
+    console.log("Используем встроенный manifest:", manifest)
     
-    // Инициализируем TON Connect UI
     tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-      manifestUrl: manifestUrl,
+      manifest: manifest,
       buttonRootId: "ton-connect-ui",
       // Включаем поддержку TON Proof
       connectRequest: {
