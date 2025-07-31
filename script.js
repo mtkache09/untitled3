@@ -680,8 +680,8 @@ async function initTonConnect() {
   try {
     console.log("🔄 Инициализация TON Connect UI...")
     
-    // Используем публичный URL для manifest
-    const manifestUrl = "https://vladimiropaits.github.io/TONConnectTest.github.io/tonconnect-manifest.json"
+    // Используем локальный URL для manifest
+    const manifestUrl = window.location.origin + "/tonconnect-manifest.json"
     console.log("Manifest URL:", manifestUrl)
     
     tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
