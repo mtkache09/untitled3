@@ -805,14 +805,9 @@ async function initTonConnect() {
     
     // Слушаем изменения статуса кошелька
     tonConnectUI.onStatusChange(wallet => {
-          console.log("Статус кошелька изменился:", wallet)
     if (wallet && wallet.account) {
-      console.log("✅ Кошелек подключен:", {
-        address: wallet.account.address,
-        chain: wallet.account.chain,
-        publicKey: wallet.account.publicKey,
-        hasProof: !!wallet.proof
-      })
+      // Показываем пользователю успешное подключение
+      showNotification("✅ TON кошелек подключен", "success", 3000)
       processWalletConnection(wallet)
       } else {
         // Кошелек отключен
@@ -835,12 +830,9 @@ async function initTonConnect() {
     // Проверяем, подключен ли кошелек
     const wallet = tonConnectUI.wallet
     if (wallet && wallet.account) {
-      console.log("🔄 Кошелек уже подключен при инициализации")
       // Проверяем, есть ли уже этот кошелек в базе данных
       await checkExistingWallet(wallet.account.address)
     }
-    
-    console.log("✅ TON Connect UI инициализирован")
     
   } catch (error) {
     console.error("❌ Ошибка инициализации TON Connect:", error)
@@ -865,7 +857,6 @@ async function processWalletConnection(wallet) {
     
     // Добавляем proof данные, если доступны
     if (wallet.proof) {
-      console.log("🔐 TON Proof получен:", wallet.proof)
       walletData.proof = {
         timestamp: wallet.proof.timestamp,
         domain: {
@@ -876,8 +867,6 @@ async function processWalletConnection(wallet) {
         payload: wallet.proof.payload,
         pubkey: wallet.proof.pubkey || wallet.account.publicKey
       }
-        } else {
-      console.log("⚠️ TON Proof не получен")
     }
     
     // Обновляем кнопку
@@ -915,12 +904,10 @@ async function checkExistingWallet(walletAddress) {
       const existingWallet = wallets.find(w => w.wallet_address === walletAddress)
       
       if (existingWallet) {
-        console.log("✅ Кошелек уже подключен в базе данных")
         // Обновляем UI без отправки данных на сервер
         updateWalletUI(walletAddress)
         return true
       } else {
-        console.log("🔄 Кошелек не найден в базе данных, подключаем...")
         // Получаем данные кошелька из TON Connect
         const wallet = tonConnectUI.wallet
         if (wallet && wallet.account) {
@@ -929,7 +916,6 @@ async function checkExistingWallet(walletAddress) {
         return false
       }
     } else {
-      console.log("⚠️ Не удалось проверить существующие кошельки")
       // В случае ошибки, все равно пытаемся подключить
       const wallet = tonConnectUI.wallet
       if (wallet && wallet.account) {
@@ -937,15 +923,14 @@ async function checkExistingWallet(walletAddress) {
       }
       return false
     }
-  } catch (error) {
-    console.error("❌ Ошибка проверки существующего кошелька:", error)
-    // В случае ошибки, все равно пытаемся подключить
-    const wallet = tonConnectUI.wallet
-    if (wallet && wallet.account) {
-      await processWalletConnection(wallet)
+      } catch (error) {
+      // В случае ошибки, все равно пытаемся подключить
+      const wallet = tonConnectUI.wallet
+      if (wallet && wallet.account) {
+        await processWalletConnection(wallet)
+      }
+      return false
     }
-    return false
-  }
 }
 
 // Обновление UI для уже подключенного кошелька
@@ -981,14 +966,10 @@ async function sendWalletToBackend() {
   }
   
   try {
-    console.log("🔄 Отправка данных кошелька на сервер...")
-    console.log("📤 Данные для отправки:", JSON.stringify(walletData, null, 2))
-    
     const headers = {
       ...getAuthHeaders(),
       "Content-Type": "application/json"
     }
-    console.log("📤 Заголовки запроса:", headers)
     
           const response = await fetch(`${API_BASE}/ton/connect`, {
             method: "POST",
@@ -998,7 +979,6 @@ async function sendWalletToBackend() {
 
           if (response.ok) {
       const data = await response.json()
-      console.log("✅ Данные кошелька отправлены успешно:", data)
       showNotification("✅ TON кошелек подключен и сохранен!", "success", 3000)
       
       // Обновляем кнопку с информацией о подключенном кошельке
@@ -1012,35 +992,26 @@ async function sendWalletToBackend() {
           ✅ ${walletData.wallet_address.substring(0, 6)}...${walletData.wallet_address.substring(walletData.wallet_address.length - 4)}
         `
       }
-          } else {
-            const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
-            console.error("❌ Ошибка отправки данных кошелька:", response.status, errorData)
-            
-            // Проверяем, не связана ли ошибка с тем, что кошелек уже существует
-            if (errorData.detail && (errorData.detail.includes("уже") || errorData.detail.includes("already") || errorData.detail.includes("существует"))) {
-              console.log("✅ Кошелек уже существует в базе данных")
-              showNotification("✅ TON кошелек уже подключен", "success", 3000)
-              
-              // Обновляем UI для уже существующего кошелька
-              updateWalletUI(walletData.wallet_address)
-            } else {
-              showNotification(
-                `❌ Ошибка сохранения кошелька: ${errorData.detail || "Неизвестная ошибка"}`,
-                "error",
-                5000
-              )
-              
-              // Если ошибка связана с TON Proof, предлагаем попробовать без него
-              if (errorData.detail && errorData.detail.includes("TON Proof")) {
-                console.log("⚠️ TON Proof не прошел проверку, попробуем подключить без него")
-                // Можно добавить логику для повторной попытки без proof
-              }
-            }
-          }
-  } catch (error) {
-    console.error("❌ Ошибка сети при отправке данных кошелька:", error)
-    showNotification("❌ Ошибка сети при сохранении кошелька", "error", 5000)
-  }
+                      } else {
+              const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
+             
+             // Проверяем, не связана ли ошибка с тем, что кошелек уже существует
+             if (errorData.detail && (errorData.detail.includes("уже") || errorData.detail.includes("already") || errorData.detail.includes("существует"))) {
+               showNotification("✅ TON кошелек уже подключен", "success", 3000)
+               
+               // Обновляем UI для уже существующего кошелька
+               updateWalletUI(walletData.wallet_address)
+             } else {
+               showNotification(
+                 `❌ Ошибка сохранения кошелька: ${errorData.detail || "Неизвестная ошибка"}`,
+                 "error",
+                 5000
+               )
+             }
+           }
+    } catch (error) {
+      showNotification("❌ Ошибка сети при сохранении кошелька", "error", 5000)
+    }
 }
 
 // Функция для возврата назад
@@ -1085,7 +1056,6 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
 // Функция для очистки ресурсов
 function cleanup() {
   // Очистка ресурсов при необходимости
-  console.log("🧹 Ресурсы очищены")
 }
 
 // Функции для работы с пополнением счета
@@ -1138,7 +1108,6 @@ async function createTopupPayload() {
     showNotification('Платеж создан! Теперь отправьте TON транзакцию', 'success')
     
   } catch (error) {
-    console.error('Ошибка создания payload:', error)
     showNotification('Ошибка создания платежа: ' + error.message, 'error')
   }
 }
@@ -1157,22 +1126,48 @@ async function sendTonTransaction() {
   }
   
   try {
-    // Проверяем, что payload не пустой
-    if (!topupPayload.payload) {
-      throw new Error("Payload не может быть пустым")
+    // Создаем правильный payload для TON комментария согласно документации
+    function createCommentPayload(comment) {
+      try {
+        if (!comment || comment.trim() === '') {
+          return undefined
+        }
+        
+        // Согласно документации TON, для текстового комментария используется простой формат:
+        // Просто UTF-8 текст, закодированный в base64
+        const commentBytes = new TextEncoder().encode(comment)
+        const base64Payload = btoa(String.fromCharCode(...commentBytes))
+        
+        // Показываем пользователю информацию
+        showNotification(`💬 Добавлен комментарий: "${comment}"`, "info", 2000)
+        
+        return base64Payload
+      } catch (error) {
+        showNotification("❌ Ошибка создания комментария", "error", 3000)
+        return undefined
+      }
     }
     
-    // Создаем транзакцию для отправки TON
+    // Создаем транзакцию для отправки TON с правильным форматом payload
+    const message = {
+      address: topupPayload.destination,
+      amount: (topupPayload.amount * 1000000000).toString() // Конвертируем в нанотоны
+    }
+    
+    // Временно отключаем payload из-за проблем совместимости с кошельками
+    // TON Connect SDK часто выдает ошибки с payload
+    // if (topupPayload.payload && topupPayload.payload.trim()) {
+    //   const formattedPayload = createCommentPayload(topupPayload.payload)
+    //   if (formattedPayload) {
+    //     message.payload = formattedPayload
+    //   }
+    // }
+    
+    showNotification(`💰 Отправка ${topupPayload.amount} TON`, "info", 2000)
+    
     const transaction = {
       validUntil: Math.floor(Date.now() / 1000) + 600, // 10 минут
-      messages: [
-        {
-          address: topupPayload.destination,
-          amount: (topupPayload.amount * 1000000000).toString(), // Конвертируем в нанотоны
-          // Используем текстовый payload без кодирования
-          payload: topupPayload.payload
-        }
-      ]
+      messages: [message]
     }
     
     // Альтернативная транзакция без payload, если основная не работает
@@ -1181,7 +1176,8 @@ async function sendTonTransaction() {
       messages: [
         {
           address: topupPayload.destination,
-          amount: (topupPayload.amount * 1000000000).toString() // Конвертируем в нанотоны
+          amount: (topupPayload.amount * 1000000000).toString(), // Конвертируем в нанотоны
+          stateInit: undefined
         }
       ]
     }
@@ -1200,38 +1196,26 @@ async function sendTonTransaction() {
         showNotification('Ошибка отправки транзакции', 'error')
       }
     } catch (transactionError) {
-      console.error('Ошибка отправки транзакции с payload:', transactionError)
+      // Показываем пользователю информацию об ошибке
+      let errorMessage = "Неизвестная ошибка транзакции"
       
-      // Если ошибка связана с payload, пробуем без него
-      if (transactionError.message && (transactionError.message.includes('payload') || transactionError.message.includes('null'))) {
-        try {
-          showNotification('Пробуем отправить транзакцию без комментария...', 'info')
-          const resultWithoutPayload = await tonConnectUI.sendTransaction(transactionWithoutPayload)
-          
-          if (resultWithoutPayload) {
-            showNotification('Транзакция отправлена! Ожидайте подтверждения...', 'success')
-            await confirmTopup()
-          } else {
-            showNotification('Ошибка отправки транзакции', 'error')
-          }
-        } catch (fallbackError) {
-          console.error('Ошибка отправки транзакции без payload:', fallbackError)
-          showNotification(`Ошибка транзакции: ${fallbackError.message}`, 'error')
-        }
-      } else {
-        // Проверяем тип ошибки
-        if (transactionError.message && transactionError.message.includes('User rejected')) {
-          showNotification('Транзакция отменена пользователем', 'warning')
-        } else if (transactionError.message && transactionError.message.includes('network')) {
-          showNotification('Ошибка сети. Попробуйте еще раз', 'error')
+      if (transactionError.message) {
+        if (transactionError.message.includes('User rejected') || transactionError.message.includes('cancelled')) {
+          showNotification('❌ Транзакция отменена пользователем', 'warning')
+          return
+        } else if (transactionError.message.includes('network') || transactionError.message.includes('connection')) {
+          errorMessage = "Ошибка сети. Проверьте подключение"
+        } else if (transactionError.message.includes('Invalid data format') || transactionError.message.includes('payload')) {
+          errorMessage = "Ошибка формата данных"
         } else {
-          showNotification(`Ошибка транзакции: ${transactionError.message}`, 'error')
+          errorMessage = transactionError.message
         }
       }
+      
+      showNotification(`❌ ${errorMessage}`, 'error', 5000)
     }
     
   } catch (error) {
-    console.error('Ошибка отправки TON транзакции:', error)
     showNotification('Ошибка отправки транзакции: ' + error.message, 'error')
   }
 }
@@ -1264,28 +1248,17 @@ async function confirmTopup() {
     }
     
   } catch (error) {
-    console.error('Ошибка подтверждения пополнения:', error)
     showNotification('Ошибка подтверждения: ' + error.message, 'error')
   }
 }
 
 // Инициализация приложения
 async function initApp() {
-  console.log("DEBUG: Начало initApp")
-  console.log("🚀 Инициализация приложения...")
-  console.log("API URL:", API_BASE)
-  console.log("Авторизация доступна:", isAuthAvailable() ? "✅ Да" : "❌ Нет")
-
-  if (window.Telegram?.WebApp?.initData) {
-    console.log("📱 Init Data длина:", window.Telegram.WebApp.initData.length)
-    // Показываем первые и последние символы для отладки
-    const initData = window.Telegram.WebApp.initData
-    console.log("📱 Init Data preview:", initData.substring(0, 50) + "..." + initData.substring(initData.length - 50))
-  }
-
   // Показываем предупреждение если нет авторизации
   if (!isAuthAvailable()) {
     showNotification("⚠️ Для полной функциональности откройте в Telegram", "info", 8000)
+  } else {
+    showNotification("✅ Приложение загружено", "success", 2000)
   }
 
   // Запускаем тест соединения для отладки
@@ -1298,9 +1271,6 @@ async function initApp() {
 
   await fetchUserFantics()
   await fetchCases()
-
-  console.log("✅ Приложение готово!")
-  console.log("DEBUG: Конец initApp")
 }
 
 initApp()
