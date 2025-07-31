@@ -684,7 +684,24 @@ async function initTonConnect() {
     const manifestUrl = "https://vladimiropaits.github.io/TONConnectTest.github.io/tonconnect-manifest.json"
     console.log("Manifest URL:", manifestUrl)
     
-    tonConnectUI = new TonConnectUI({
+    // Проверяем доступные глобальные объекты
+    console.log("🔍 Доступные глобальные объекты:", {
+      TonConnectUI: typeof TonConnectUI,
+      window_TonConnectUI: typeof window.TonConnectUI,
+      global_TonConnectUI: typeof global?.TonConnectUI
+    })
+    
+    // Пробуем разные способы инициализации
+    let TonConnectUIClass = null
+    if (typeof TonConnectUI !== 'undefined') {
+      TonConnectUIClass = TonConnectUI
+    } else if (typeof window.TonConnectUI !== 'undefined') {
+      TonConnectUIClass = window.TonConnectUI
+    } else {
+      throw new Error("TonConnectUI не найден. Проверьте загрузку библиотеки.")
+    }
+    
+    tonConnectUI = new TonConnectUIClass({
       manifestUrl: manifestUrl,
       buttonRootId: "ton-connect-ui"
     })
