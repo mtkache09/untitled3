@@ -33,6 +33,65 @@ let isSpinning = false
 let userFantics = 0
 let selectedDepositAmount = null
 
+// Функция для отладочного логирования
+function debugLog(message) {
+  console.log(message)
+  const debugLog = document.getElementById('debugLog')
+  if (debugLog) {
+    const timestamp = new Date().toLocaleTimeString()
+    debugLog.innerHTML += `<div>[${timestamp}] ${message}</div>`
+    debugLog.scrollTop = debugLog.scrollHeight
+  }
+}
+
+// Функция для тестирования TON Connect в интерфейсе
+function testTonConnectDebug() {
+  debugLog('🧪 Запуск теста TON Connect...')
+  
+  // Проверяем доступность библиотеки
+  debugLog(`📚 TON_CONNECT_UI доступен: ${typeof TON_CONNECT_UI !== 'undefined'}`)
+  
+  if (typeof TON_CONNECT_UI === 'undefined') {
+    debugLog('❌ TON_CONNECT_UI не загружен')
+    return
+  }
+  
+  debugLog('✅ TON_CONNECT_UI загружен')
+  
+  // Проверяем manifest
+  const manifestUrl = "https://vladimiropaits.github.io/TONConnectTest.github.io/tonconnect-manifest.json"
+  debugLog(`📄 Проверяем manifest: ${manifestUrl}`)
+  
+  fetch(manifestUrl)
+    .then(response => {
+      debugLog(`📄 Manifest статус: ${response.status}`)
+      if (response.ok) {
+        debugLog('✅ Manifest доступен')
+        return response.json()
+      } else {
+        debugLog('❌ Manifest недоступен')
+        throw new Error('Manifest недоступен')
+      }
+    })
+    .then(manifest => {
+      debugLog(`📄 Manifest загружен: ${manifest.name}`)
+      
+      // Пробуем инициализировать TON Connect
+      try {
+        const testUI = new TON_CONNECT_UI.TonConnectUI({
+          manifestUrl: manifestUrl,
+          buttonRootId: "ton-connect-ui"
+        })
+        debugLog('✅ TON Connect UI инициализирован успешно')
+      } catch (error) {
+        debugLog(`❌ Ошибка инициализации: ${error.message}`)
+      }
+    })
+    .catch(error => {
+      debugLog(`❌ Ошибка: ${error.message}`)
+    })
+}
+
 // Функция для получения авторизационных заголовков
 function getAuthHeaders() {
   const headers = {
@@ -678,11 +737,18 @@ async function spinPrizes() {
 // Инициализация TON Connect UI
 async function initTonConnect() {
   try {
-    console.log("🔄 Инициализация TON Connect UI...")
+    debugLog("🔄 Инициализация TON Connect UI...")
+    
+    // Проверяем доступность TON_CONNECT_UI
+    debugLog(`🔍 TON_CONNECT_UI: ${typeof TON_CONNECT_UI !== 'undefined' ? 'доступен' : 'недоступен'}`)
+    
+    if (typeof TON_CONNECT_UI === 'undefined') {
+      throw new Error("TON_CONNECT_UI не загружен. Проверьте подключение библиотеки.")
+    }
     
     // Используем публичный URL для manifest
     const manifestUrl = "https://vladimiropaits.github.io/TONConnectTest.github.io/tonconnect-manifest.json"
-    console.log("Manifest URL:", manifestUrl)
+    debugLog(`📄 Manifest URL: ${manifestUrl}`)
     
     tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: manifestUrl,

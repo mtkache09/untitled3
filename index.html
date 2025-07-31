@@ -62,6 +62,15 @@
 
       <!-- TON Connect UI Container -->
       <div id="ton-connect-ui" class="mb-4"></div>
+      
+      <!-- Debug Panel -->
+      <div id="debugPanel" class="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-lg p-3 mb-4">
+          <h3 class="text-white font-semibold mb-2">🔧 Отладка TON Connect</h3>
+          <div id="debugLog" class="text-xs text-gray-300 max-h-32 overflow-y-auto"></div>
+          <button onclick="testTonConnectDebug()" class="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
+              Тест TON Connect
+          </button>
+      </div>
       </div>
 
       <!-- Cases Section -->
