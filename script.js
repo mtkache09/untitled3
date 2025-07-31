@@ -748,24 +748,58 @@ async function initTonConnect() {
     }
     
     // Используем локальный manifest
-    const manifestUrl = window.location.origin + "/tonconnect-manifest.json"
+    const currentPath = window.location.pathname.endsWith('/') 
+      ? window.location.pathname 
+      : window.location.pathname + '/'
+    const manifestUrl = window.location.origin + currentPath + "tonconnect-manifest.json"
     debugLog(`📄 Manifest URL: ${manifestUrl}`)
+    debugLog(`🌐 Current location: ${window.location.href}`)
+    debugLog(`📂 Current path: ${window.location.pathname}`)
     
     // Проверяем доступность manifest
+    let finalManifestUrl = manifestUrl
     try {
       const manifestResponse = await fetch(manifestUrl)
       if (!manifestResponse.ok) {
-        throw new Error(`Manifest недоступен: ${manifestResponse.status}`)
+        // Пробуем альтернативные пути
+        const altPaths = [
+          window.location.origin + "/tonconnect-manifest.json",
+          window.location.origin + "/untitled3/tonconnect-manifest.json",
+          "https://vladimiropaits.github.io/Casino/tonconnect-manifest.json",
+          "https://vladimiropaits.github.io/Casino/untitled3/tonconnect-manifest.json"
+        ]
+        
+        let manifestFound = false
+        for (const altPath of altPaths) {
+          try {
+            const altResponse = await fetch(altPath)
+            if (altResponse.ok) {
+              finalManifestUrl = altPath
+              manifestFound = true
+              debugLog(`📄 Manifest найден по альтернативному пути: ${altPath}`)
+              break
+            }
+          } catch (e) {
+            // Игнорируем ошибки альтернативных путей
+          }
+        }
+        
+        if (!manifestFound) {
+          throw new Error(`Manifest недоступен: ${manifestResponse.status}`)
+        }
       }
-      const manifest = await manifestResponse.json()
+      
+      const manifest = await fetch(finalManifestUrl).then(r => r.json())
       debugLog(`📄 Manifest загружен: ${manifest.name}`)
     } catch (manifestError) {
       debugLog(`⚠️ Ошибка загрузки manifest: ${manifestError.message}`)
-      // Продолжаем без проверки manifest
+      // Используем fallback URL
+      finalManifestUrl = "https://vladimiropaits.github.io/Casino/untitled3/tonconnect-manifest.json"
+      debugLog(`📄 Используем fallback manifest: ${finalManifestUrl}`)
     }
     
     tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-      manifestUrl: manifestUrl,
+      manifestUrl: finalManifestUrl,
       buttonRootId: "ton-connect-ui"
     })
     
