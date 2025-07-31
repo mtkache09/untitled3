@@ -680,36 +680,32 @@ async function initTonConnect() {
   try {
     console.log("🔄 Инициализация TON Connect UI...")
     
-    // Используем правильный URL для manifest
-    const manifestUrl = "https://mtkache09.github.io/telegram-stars-case/tonconnect-manifest.json"
+    // Используем локальный manifest для разработки
+    const manifestUrl = window.location.origin + "/tonconnect-manifest.json"
     
     console.log("Manifest URL:", manifestUrl)
     
     // Проверяем доступность manifest
     const manifestResponse = await fetch(manifestUrl)
     if (!manifestResponse.ok) {
-      throw new Error(`Manifest не доступен: ${manifestResponse.status} ${manifestResponse.statusText}`)
+      console.warn(`⚠️ Локальный manifest недоступен: ${manifestResponse.status}, используем fallback`)
+      // Используем fallback URL
+      const fallbackUrl = "https://vladimiropaits.github.io/TONConnectTest.github.io/tonconnect-manifest.json"
+      const fallbackResponse = await fetch(fallbackUrl)
+      if (!fallbackResponse.ok) {
+        throw new Error(`Manifest недоступен ни локально, ни по fallback URL`)
+      }
+      const manifest = await fallbackResponse.json()
+      console.log("Manifest загружен с fallback:", manifest)
+    } else {
+      const manifest = await manifestResponse.json()
+      console.log("Manifest загружен локально:", manifest)
     }
-    
-    const manifest = await manifestResponse.json()
-    console.log("Manifest загружен успешно:", manifest)
     
     // Инициализируем TON Connect UI
     tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: manifestUrl,
-      buttonRootId: "ton-connect-ui",
-      // Включаем поддержку TON Proof
-      connectRequest: {
-        items: [
-          {
-            name: "ton_addr"
-          },
-          {
-            name: "ton_proof",
-            payload: Date.now().toString() // Простой payload для тестирования
-          }
-        ]
-      }
+      buttonRootId: "ton-connect-ui"
     })
     
     // Слушаем изменения статуса кошелька
