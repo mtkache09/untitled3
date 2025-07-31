@@ -751,6 +751,19 @@ async function initTonConnect() {
     const manifestUrl = window.location.origin + "/tonconnect-manifest.json"
     debugLog(`📄 Manifest URL: ${manifestUrl}`)
     
+    // Проверяем доступность manifest
+    try {
+      const manifestResponse = await fetch(manifestUrl)
+      if (!manifestResponse.ok) {
+        throw new Error(`Manifest недоступен: ${manifestResponse.status}`)
+      }
+      const manifest = await manifestResponse.json()
+      debugLog(`📄 Manifest загружен: ${manifest.name}`)
+    } catch (manifestError) {
+      debugLog(`⚠️ Ошибка загрузки manifest: ${manifestError.message}`)
+      // Продолжаем без проверки manifest
+    }
+    
     tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: manifestUrl,
       buttonRootId: "ton-connect-ui"
@@ -789,7 +802,8 @@ async function initTonConnect() {
     const wallet = tonConnectUI.wallet
     if (wallet && wallet.account) {
       console.log("🔄 Кошелек уже подключен при инициализации")
-      processWalletConnection(wallet)
+      // Проверяем, есть ли уже этот кошелек в базе данных
+      await checkExistingWallet(wallet.account.address)
     }
     
     console.log("✅ TON Connect UI инициализирован")
@@ -854,6 +868,77 @@ async function processWalletConnection(wallet) {
   }
 }
 
+// Проверка существующего кошелька
+async function checkExistingWallet(walletAddress) {
+  try {
+    const response = await fetch(`${API_BASE}/ton/wallets`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    })
+    
+    if (response.ok) {
+      const wallets = await response.json()
+      const existingWallet = wallets.find(w => w.wallet_address === walletAddress)
+      
+      if (existingWallet) {
+        console.log("✅ Кошелек уже подключен в базе данных")
+        // Обновляем UI без отправки данных на сервер
+        updateWalletUI(walletAddress)
+        return true
+      } else {
+        console.log("🔄 Кошелек не найден в базе данных, подключаем...")
+        // Получаем данные кошелька из TON Connect
+        const wallet = tonConnectUI.wallet
+        if (wallet && wallet.account) {
+          await processWalletConnection(wallet)
+        }
+        return false
+      }
+    } else {
+      console.log("⚠️ Не удалось проверить существующие кошельки")
+      // В случае ошибки, все равно пытаемся подключить
+      const wallet = tonConnectUI.wallet
+      if (wallet && wallet.account) {
+        await processWalletConnection(wallet)
+      }
+      return false
+    }
+  } catch (error) {
+    console.error("❌ Ошибка проверки существующего кошелька:", error)
+    // В случае ошибки, все равно пытаемся подключить
+    const wallet = tonConnectUI.wallet
+    if (wallet && wallet.account) {
+      await processWalletConnection(wallet)
+    }
+    return false
+  }
+}
+
+// Обновление UI для уже подключенного кошелька
+function updateWalletUI(walletAddress) {
+  walletData = {
+    wallet_address: walletAddress,
+    user_id: getUserId(),
+    network: "-239", // TON mainnet
+    public_key: null
+  }
+  
+  // Обновляем кнопку
+  const connectBtn = document.getElementById("connectTonWalletBtn")
+  if (connectBtn) {
+    connectBtn.disabled = true
+    connectBtn.innerHTML = `
+      <svg class="w-5 h-5 mr-2 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"></path>
+        <path d="M12 6v6l4 2"></path>
+      </svg>
+      ✅ ${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}
+    `
+  }
+  
+  showNotification("✅ TON кошелек уже подключен", "success", 3000)
+}
+
 // Отправка данных кошелька на сервер
 async function sendWalletToBackend() {
   if (!walletData) {
@@ -895,19 +980,29 @@ async function sendWalletToBackend() {
       }
           } else {
             const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
-      console.error("❌ Ошибка отправки данных кошелька:", response.status, errorData)
-            showNotification(
-        `❌ Ошибка сохранения кошелька: ${errorData.detail || "Неизвестная ошибка"}`,
-              "error",
-        5000
-            )
-      
-      // Если ошибка связана с TON Proof, предлагаем попробовать без него
-      if (errorData.detail && errorData.detail.includes("TON Proof")) {
-        console.log("⚠️ TON Proof не прошел проверку, попробуем подключить без него")
-        // Можно добавить логику для повторной попытки без proof
+            console.error("❌ Ошибка отправки данных кошелька:", response.status, errorData)
+            
+            // Проверяем, не связана ли ошибка с тем, что кошелек уже существует
+            if (errorData.detail && (errorData.detail.includes("уже") || errorData.detail.includes("already") || errorData.detail.includes("существует"))) {
+              console.log("✅ Кошелек уже существует в базе данных")
+              showNotification("✅ TON кошелек уже подключен", "success", 3000)
+              
+              // Обновляем UI для уже существующего кошелька
+              updateWalletUI(walletData.wallet_address)
+            } else {
+              showNotification(
+                `❌ Ошибка сохранения кошелька: ${errorData.detail || "Неизвестная ошибка"}`,
+                "error",
+                5000
+              )
+              
+              // Если ошибка связана с TON Proof, предлагаем попробовать без него
+              if (errorData.detail && errorData.detail.includes("TON Proof")) {
+                console.log("⚠️ TON Proof не прошел проверку, попробуем подключить без него")
+                // Можно добавить логику для повторной попытки без proof
+              }
+            }
           }
-        }
   } catch (error) {
     console.error("❌ Ошибка сети при отправке данных кошелька:", error)
     showNotification("❌ Ошибка сети при сохранении кошелька", "error", 5000)
@@ -1020,6 +1115,13 @@ async function sendTonTransaction() {
     return
   }
   
+  // Проверяем, что кошелек подключен
+  const wallet = tonConnectUI.wallet
+  if (!wallet || !wallet.account) {
+    showNotification('Сначала подключите TON кошелек', 'error')
+    return
+  }
+  
   try {
     // Проверяем, что payload не пустой
     if (!topupPayload.payload) {
@@ -1033,22 +1135,65 @@ async function sendTonTransaction() {
         {
           address: topupPayload.destination,
           amount: (topupPayload.amount * 1000000000).toString(), // Конвертируем в нанотоны
+          // Используем текстовый payload без кодирования
           payload: topupPayload.payload
         }
       ]
     }
     
-    // Отправляем транзакцию через TON Connect
-    const result = await tonConnectUI.sendTransaction(transaction)
+    // Альтернативная транзакция без payload, если основная не работает
+    const transactionWithoutPayload = {
+      validUntil: Math.floor(Date.now() / 1000) + 600, // 10 минут
+      messages: [
+        {
+          address: topupPayload.destination,
+          amount: (topupPayload.amount * 1000000000).toString() // Конвертируем в нанотоны
+        }
+      ]
+    }
     
-    if (result) {
-      showNotification('Транзакция отправлена! Ожидайте подтверждения...', 'success')
+    // Отправляем транзакцию через TON Connect
+    try {
+      const result = await tonConnectUI.sendTransaction(transaction)
       
-      // Подтверждаем пополнение на бэкенде
-      await confirmTopup()
+      if (result) {
+        showNotification('Транзакция отправлена! Ожидайте подтверждения...', 'success')
+        
+        // Подтверждаем пополнение на бэкенде
+        await confirmTopup()
+        
+      } else {
+        showNotification('Ошибка отправки транзакции', 'error')
+      }
+    } catch (transactionError) {
+      console.error('Ошибка отправки транзакции с payload:', transactionError)
       
-    } else {
-      showNotification('Ошибка отправки транзакции', 'error')
+      // Если ошибка связана с payload, пробуем без него
+      if (transactionError.message && (transactionError.message.includes('payload') || transactionError.message.includes('null'))) {
+        try {
+          showNotification('Пробуем отправить транзакцию без комментария...', 'info')
+          const resultWithoutPayload = await tonConnectUI.sendTransaction(transactionWithoutPayload)
+          
+          if (resultWithoutPayload) {
+            showNotification('Транзакция отправлена! Ожидайте подтверждения...', 'success')
+            await confirmTopup()
+          } else {
+            showNotification('Ошибка отправки транзакции', 'error')
+          }
+        } catch (fallbackError) {
+          console.error('Ошибка отправки транзакции без payload:', fallbackError)
+          showNotification(`Ошибка транзакции: ${fallbackError.message}`, 'error')
+        }
+      } else {
+        // Проверяем тип ошибки
+        if (transactionError.message && transactionError.message.includes('User rejected')) {
+          showNotification('Транзакция отменена пользователем', 'warning')
+        } else if (transactionError.message && transactionError.message.includes('network')) {
+          showNotification('Ошибка сети. Попробуйте еще раз', 'error')
+        } else {
+          showNotification(`Ошибка транзакции: ${transactionError.message}`, 'error')
+        }
+      }
     }
     
   } catch (error) {
