@@ -1031,6 +1031,12 @@ document.getElementById("depositBtn").addEventListener("click", openTopupModal)
 document.getElementById("closeTopupModal").addEventListener("click", closeTopupModal)
 document.getElementById("createTopupPayload").addEventListener("click", createTopupPayload)
 document.getElementById("sendTonTransaction").addEventListener("click", sendTonTransaction)
+document.getElementById("payWithStars").addEventListener("click", payWithStars)
+
+// Payment method change handlers
+document.querySelectorAll('input[name="paymentMethod"]').forEach(radio => {
+  radio.addEventListener('change', updatePaymentMethodUI)
+})
 
 // Закрытие модального окна при клике вне его
 document.getElementById("topupModal").addEventListener("click", (e) => {
@@ -1062,9 +1068,45 @@ function cleanup() {
 function openTopupModal() {
   document.getElementById('topupModal').classList.remove('hidden')
   document.getElementById('topupAmount').value = '1000'
+  resetTopupModal()
+}
+
+function resetTopupModal() {
+  // Скрываем все блоки информации о платеже
   document.getElementById('tonPaymentInfo').classList.add('hidden')
+  document.getElementById('starsPaymentInfo').classList.add('hidden')
+  
+  // Показываем кнопку создания платежа, скрываем остальные
   document.getElementById('createTopupPayload').classList.remove('hidden')
   document.getElementById('sendTonTransaction').classList.add('hidden')
+  document.getElementById('payWithStars').classList.add('hidden')
+  
+  // Обновляем текст кнопки и интерфейс в зависимости от выбранного способа оплаты
+  updatePaymentMethodUI()
+  
+  // Очищаем payload
+  topupPayload = null
+}
+
+function updatePaymentMethodUI() {
+  const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value
+  const createButton = document.getElementById('createTopupPayload')
+  const createButtonText = document.getElementById('createPayloadText')
+  
+  if (paymentMethod === 'telegram_stars') {
+    createButtonText.textContent = '⭐ Подготовить оплату звездочками'
+    createButton.className = 'flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded'
+  } else {
+    createButtonText.textContent = 'Создать TON платеж'
+    createButton.className = 'flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded'
+  }
+  
+  // Скрываем блоки информации при переключении
+  document.getElementById('tonPaymentInfo').classList.add('hidden')
+  document.getElementById('starsPaymentInfo').classList.add('hidden')
+  document.getElementById('sendTonTransaction').classList.add('hidden')
+  document.getElementById('payWithStars').classList.add('hidden')
+  document.getElementById('createTopupPayload').classList.remove('hidden')
 }
 
 function closeTopupModal() {
