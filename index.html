@@ -112,8 +112,8 @@
                       <span class="text-white">TON коины</span>
                   </label>
                   <label class="flex items-center">
-                      <input type="radio" name="paymentMethod" value="telegram_stars" class="mr-2" disabled>
-                      <span class="text-gray-500">Telegram Stars (скоро)</span>
+                      <input type="radio" name="paymentMethod" value="telegram_stars" class="mr-2">
+                      <span class="text-white">Telegram Stars ⭐</span>
                   </label>
               </div>
           </div>
@@ -131,12 +131,27 @@
               </div>
           </div>
           
+          <div id="starsPaymentInfo" class="mb-4 p-3 bg-yellow-900/30 border border-yellow-500/30 rounded text-sm text-yellow-200 hidden">
+              <div class="mb-2">
+                  <strong>Способ оплаты:</strong> Telegram Stars ⭐
+              </div>
+              <div class="mb-2">
+                  <strong>Сумма:</strong> <span id="starsAmount">0</span> фантиков
+              </div>
+              <div class="text-xs text-yellow-300">
+                  После нажатия кнопки "Оплатить звездочками" будет отправлен запрос в телеграм бота для оплаты
+              </div>
+          </div>
+          
           <div class="flex gap-3">
               <button id="createTopupPayload" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
-                  Создать платеж
+                  <span id="createPayloadText">Создать платеж</span>
               </button>
               <button id="sendTonTransaction" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded hidden">
                   Отправить TON
+              </button>
+              <button id="payWithStars" class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded hidden">
+                  ⭐ Оплатить звездочками
               </button>
           </div>
       </div>

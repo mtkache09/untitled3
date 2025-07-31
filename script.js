@@ -1081,13 +1081,19 @@ async function createTopupPayload() {
     return
   }
   
+  if (paymentMethod === 'telegram_stars') {
+    // Обрабатываем оплату звездочками
+    await processStarsPayment(amount)
+    return
+  }
+  
+  // Обрабатываем TON оплату
   try {
-    const response = await fetch(`${API_BASE}/topup/create_payload`, {
+    const response = await fetch(`${API_BASE}/topup/ton/create_payload`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({
-        amount: amount,
-        payment_method: paymentMethod
+        amount: amount
       })
     })
     
@@ -1097,18 +1103,20 @@ async function createTopupPayload() {
     
     topupPayload = await response.json()
     
-    // Показываем информацию о платеже
+    // Показываем информацию о TON платеже
     document.getElementById('tonAmount').textContent = topupPayload.amount
     document.getElementById('destinationAddress').textContent = topupPayload.destination
     document.getElementById('paymentComment').textContent = topupPayload.comment
     document.getElementById('tonPaymentInfo').classList.remove('hidden')
+    document.getElementById('starsPaymentInfo').classList.add('hidden')
     document.getElementById('createTopupPayload').classList.add('hidden')
     document.getElementById('sendTonTransaction').classList.remove('hidden')
+    document.getElementById('payWithStars').classList.add('hidden')
     
-    showNotification('Платеж создан! Теперь отправьте TON транзакцию', 'success')
+    showNotification('TON платеж создан! Теперь отправьте транзакцию', 'success')
     
   } catch (error) {
-    showNotification('Ошибка создания платежа: ' + error.message, 'error')
+    showNotification('Ошибка создания TON платежа: ' + error.message, 'error')
   }
 }
 
@@ -1220,16 +1228,34 @@ async function sendTonTransaction() {
   }
 }
 
-async function confirmTopup() {
-  if (!topupPayload) return
+// Функция для обработки оплаты звездочками
+async function processStarsPayment(amount) {
+  try {
+    // Показываем информацию о звездочках
+    document.getElementById('starsAmount').textContent = amount
+    document.getElementById('starsPaymentInfo').classList.remove('hidden')
+    document.getElementById('tonPaymentInfo').classList.add('hidden')
+    document.getElementById('createTopupPayload').classList.add('hidden')
+    document.getElementById('sendTonTransaction').classList.add('hidden')
+    document.getElementById('payWithStars').classList.remove('hidden')
+    
+    showNotification('Готов к оплате звездочками! Нажмите кнопку для отправки запроса', 'info')
+    
+  } catch (error) {
+    showNotification('Ошибка подготовки оплаты звездочками: ' + error.message, 'error')
+  }
+}
+
+// Функция для отправки запроса на оплату звездочками
+async function payWithStars() {
+  const amount = parseInt(document.getElementById('topupAmount').value)
   
   try {
-    const response = await fetch(`${API_BASE}/topup/confirm`, {
+    const response = await fetch(`${API_BASE}/topup/stars`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({
-        amount: parseInt(document.getElementById('topupAmount').value),
-        payment_method: 'ton'
+        amount: amount
       })
     })
     
@@ -1240,15 +1266,46 @@ async function confirmTopup() {
     const result = await response.json()
     
     if (result.success) {
-      showNotification(result.message, 'success')
+      showNotification('✅ Запрос на оплату звездочками отправлен! Ожидайте сообщение от бота в телеграме', 'success', 7000)
       closeTopupModal()
-      await fetchUserFantics() // Обновляем баланс
+      // Не обновляем баланс сразу, так как оплата проходит через бота
     } else {
-      showNotification('Ошибка подтверждения пополнения', 'error')
+      showNotification('Ошибка отправки запроса на звездочки', 'error')
     }
     
   } catch (error) {
-    showNotification('Ошибка подтверждения: ' + error.message, 'error')
+    showNotification('Ошибка запроса звездочек: ' + error.message, 'error')
+  }
+}
+
+async function confirmTopup() {
+  if (!topupPayload) return
+  
+  try {
+    const response = await fetch(`${API_BASE}/topup/ton/confirm`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        amount: parseInt(document.getElementById('topupAmount').value)
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      showNotification(`✅ ${result.message} (+${result.added_amount} фантиков)`, 'success')
+      closeTopupModal()
+      await fetchUserFantics() // Обновляем баланс
+    } else {
+      showNotification('Ошибка подтверждения TON пополнения', 'error')
+    }
+    
+  } catch (error) {
+    showNotification('Ошибка подтверждения TON: ' + error.message, 'error')
   }
 }
 
