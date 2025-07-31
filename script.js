@@ -60,7 +60,7 @@ function testTonConnectDebug() {
   debugLog('✅ TON_CONNECT_UI загружен')
   
   // Проверяем manifest
-  const manifestUrl = "https://vladimiropaits.github.io/TONConnectTest.github.io/tonconnect-manifest.json"
+  const manifestUrl = window.location.origin + "/tonconnect-manifest.json"
   debugLog(`📄 Проверяем manifest: ${manifestUrl}`)
   
   fetch(manifestUrl)
@@ -747,8 +747,8 @@ async function initTonConnect() {
       throw new Error("TON_CONNECT_UI не загружен. Проверьте подключение библиотеки.")
     }
     
-    // Используем публичный URL для manifest
-    const manifestUrl = "https://vladimiropaits.github.io/TONConnectTest.github.io/tonconnect-manifest.json"
+    // Используем локальный manifest
+    const manifestUrl = window.location.origin + "/tonconnect-manifest.json"
     debugLog(`📄 Manifest URL: ${manifestUrl}`)
     
     tonConnectUI = new TON_CONNECT_UI.TonConnectUI({

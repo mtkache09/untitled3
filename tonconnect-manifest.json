@@ -1,9 +1,9 @@
 {
-  "url": "https://vladimiropaits.github.io/TONConnectTest.github.io/",
+  "url": "https://mtkache09.github.io/telegram-stars-case/",
   "name": "Fantics Casino - Telegram Mini App",
   "iconUrl": "https://ton.org/download/ton_symbol.png",
-  "termsOfUseUrl": "https://vladimiropaits.github.io/TONConnectTest.github.io/",
-  "privacyPolicyUrl": "https://vladimiropaits.github.io/TONConnectTest.github.io/",
+  "termsOfUseUrl": "https://mtkache09.github.io/telegram-stars-case/",
+  "privacyPolicyUrl": "https://mtkache09.github.io/telegram-stars-case/",
   "features": ["ton_addr", "ton_proof"],
   "items": [
     {
