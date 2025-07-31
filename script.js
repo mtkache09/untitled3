@@ -680,8 +680,8 @@ async function initTonConnect() {
   try {
     console.log("🔄 Инициализация TON Connect UI...")
     
-    // Используем встроенный manifest для избежания проблем с внешними URL
-    const manifest = {
+    // Создаем локальный URL для manifest
+    const manifestBlob = new Blob([JSON.stringify({
       "url": window.location.origin,
       "name": "Fantics Casino - Telegram Mini App",
       "iconUrl": "https://ton.org/download/ton_symbol.png",
@@ -698,25 +698,14 @@ async function initTonConnect() {
           "description": "Request TON proof for authentication"
         }
       ]
-    }
+    })], { type: 'application/json' });
     
-    console.log("Используем встроенный manifest:", manifest)
+    const manifestUrl = URL.createObjectURL(manifestBlob);
+    console.log("Создан локальный manifest URL:", manifestUrl)
     
     tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-      manifest: manifest,
-      buttonRootId: "ton-connect-ui",
-      // Включаем поддержку TON Proof
-      connectRequest: {
-        items: [
-          {
-            name: "ton_addr"
-          },
-          {
-            name: "ton_proof",
-            payload: Date.now().toString() // Простой payload для тестирования
-          }
-        ]
-      }
+      manifestUrl: manifestUrl,
+      buttonRootId: "ton-connect-ui"
     })
     
     // Слушаем изменения статуса кошелька
@@ -756,6 +745,9 @@ async function initTonConnect() {
     }
     
     console.log("✅ TON Connect UI инициализирован")
+    
+    // Сохраняем URL для очистки
+    window.manifestUrl = manifestUrl
     
   } catch (error) {
     console.error("❌ Ошибка инициализации TON Connect:", error)
@@ -908,6 +900,14 @@ document.getElementById("depositModal").addEventListener("click", (e) => {
   }
 })
 
+// Функция для очистки ресурсов
+function cleanup() {
+  if (window.manifestUrl) {
+    URL.revokeObjectURL(window.manifestUrl)
+    console.log("🧹 Manifest URL очищен")
+  }
+}
+
 // Инициализация приложения
 async function initApp() {
   console.log("DEBUG: Начало initApp")
@@ -943,3 +943,6 @@ async function initApp() {
 }
 
 initApp()
+
+// Очистка при закрытии страницы
+window.addEventListener('beforeunload', cleanup)
