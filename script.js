@@ -1021,7 +1021,10 @@ async function sendTonTransaction() {
   }
   
   try {
-    console.log("🔍 Отправка TON транзакции:", topupPayload)
+    // Проверяем, что payload не пустой
+    if (!topupPayload.payload) {
+      throw new Error("Payload не может быть пустым")
+    }
     
     // Создаем транзакцию для отправки TON
     const transaction = {
@@ -1030,13 +1033,10 @@ async function sendTonTransaction() {
         {
           address: topupPayload.destination,
           amount: (topupPayload.amount * 1000000000).toString(), // Конвертируем в нанотоны
-          // Используем payload из бэкенда
           payload: topupPayload.payload
         }
       ]
     }
-    
-    console.log("📤 Транзакция для отправки:", transaction)
     
     // Отправляем транзакцию через TON Connect
     const result = await tonConnectUI.sendTransaction(transaction)
