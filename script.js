@@ -526,7 +526,7 @@ function renderDepositAmounts() {
   const depositAmounts = document.getElementById("depositAmounts")
   if (!depositAmounts) return
   
-  const amounts = [100, 500, 1000, 2000, 5000, 10000]
+  const amounts = [10, 50, 100, 500, 1000, 5000]
   
   depositAmounts.innerHTML = ""
   
@@ -1067,7 +1067,7 @@ function cleanup() {
 // Функции для работы с пополнением счета
 function openTopupModal() {
   document.getElementById('topupModal').classList.remove('hidden')
-  document.getElementById('topupAmount').value = '1000'
+  document.getElementById('topupAmount').value = '10'
   resetTopupModal()
 }
 
@@ -1118,8 +1118,8 @@ async function createTopupPayload() {
   const amount = parseInt(document.getElementById('topupAmount').value)
   const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value
   
-  if (!amount || amount < 100) {
-    showNotification('Минимальная сумма пополнения: 100 фантиков', 'error')
+  if (!amount || amount < 1) {
+    showNotification('Минимальная сумма пополнения: 1 фантик', 'error')
     return
   }
   
