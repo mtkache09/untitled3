@@ -338,40 +338,10 @@ function generateDefaultPrizesForDisplay(caseCost) {
     ]
   }
 }
-```
 
-## Шаг 2: Исправьте script.js
 
-В вашем файле `script.js` найдите эту строку:
 
-```javascript
-let iconUrl = "/images/starter-case-icon.png" // По умолчанию стартовый
-```
 
-**Замените на:**
-
-```javascript
-let iconUrl = "images/starter-case-icon.png" // По умолчанию стартовый (убираем слеш)
-```
-
-И также замените все остальные пути:
-
-```javascript
-if (name.includes("стартовый") || name.includes("starter")) {
-  iconUrl = "images/starter-case-icon.png"  // убираем слеш
-} else if (name.includes("премиум") || name.includes("premium")) {
-  iconUrl = "images/premium-case-icon.png"  // убираем слеш
-} else if (name.includes("vip") || name.includes("вип")) {
-  iconUrl = "images/vip-case-icon.png"     // убираем слеш
-}
-```
-
-## Шаг 3: Обновите style.css
-
-**Добавьте** в конец вашего файла `style.css` эти строки:
-
-```css
-/* Убираем все эффекты подсвечивания призов */
 .prize-winner,
 .prize-highlight,
 .prize-glow {
@@ -403,4 +373,4 @@ if (name.includes("стартовый") || name.includes("starter")) {
   transform: none !important;
   box-shadow: none !important;
 }
-```
+
