@@ -1,9 +1,11 @@
+// Исправленный главный файл приложения (адаптированный под серверный API)
 import { telegramManager } from "./telegram.js"
 import { apiManager } from "./api.js"
 import { tonConnectManager } from "./ton-connect.js"
 import { gameManager } from "./game.js"
 import { paymentManager } from "./payments.js"
 import { showNotification, showConnectionStatus, renderCases, updateFanticsDisplay } from "./ui.js"
+import { STATE } from "./config.js"
 
 class App {
   constructor() {
@@ -26,6 +28,7 @@ class App {
           connectionOk ? "✅ Соединение с сервером установлено" : "❌ Ошибка соединения с сервером",
           !connectionOk,
         )
+        STATE.isConnected = connectionOk
       }
 
       // Инициализируем TON Connect
@@ -49,79 +52,102 @@ class App {
       // Загружаем баланс пользователя
       const fantics = await apiManager.fetchUserFantics()
       if (fantics !== null) {
+        STATE.userFantics = fantics
         updateFanticsDisplay()
       }
 
       // Загружаем кейсы
       const cases = await apiManager.fetchCases()
       if (cases) {
-        // Обрабатываем кейсы: добавляем иконки и призы
-        const processedCases = cases.map((caseData) => {
-          const name = caseData.name.toLowerCase()
-
-          // Определяем иконку в зависимости от названия
-          let icon = "⭐"
-
-          if (name.includes("стартовый")) {
-            icon = "🟢" // Зеленая звездочка
-          } else if (name.includes("премиум")) {
-            icon = "🟡" // Желтая звездочка
-          } else if (name.includes("vip") || name.includes("вип")) {
-            icon = "🔴" // Красная звездочка
-          }
-
-          // Создаем призы если их нет
-          let possible_prizes = caseData.possible_prizes || []
-
-          if (!possible_prizes.length) {
-            // Генерируем призы в зависимости от стоимости кейса
-            if (caseData.cost <= 100) {
-              // Стартовый кейс
-              possible_prizes = [
-                { name: "50 фантиков", cost: 50, icon: "💎", chance: 40 },
-                { name: "100 фантиков", cost: 100, icon: "💎", chance: 35 },
-                { name: "200 фантиков", cost: 200, icon: "💎", chance: 20 },
-                { name: "500 фантиков", cost: 500, icon: "💎", chance: 5 },
-              ]
-            } else if (caseData.cost <= 500) {
-              // Премиум кейс
-              possible_prizes = [
-                { name: "200 фантиков", cost: 200, icon: "💎", chance: 30 },
-                { name: "500 фантиков", cost: 500, icon: "💎", chance: 35 },
-                { name: "1000 фантиков", cost: 1000, icon: "💎", chance: 25 },
-                { name: "2500 фантиков", cost: 2500, icon: "💎", chance: 10 },
-              ]
-            } else {
-              // VIP кейс
-              possible_prizes = [
-                { name: "1000 фантиков", cost: 1000, icon: "💎", chance: 25 },
-                { name: "2000 фантиков", cost: 2000, icon: "💎", chance: 35 },
-                { name: "5000 фантиков", cost: 5000, icon: "💎", chance: 30 },
-                { name: "10000 фантиков", cost: 10000, icon: "💎", chance: 10 },
-              ]
-            }
-          }
-
-          return {
-            ...caseData,
-            icon: icon,
-            possible_prizes: possible_prizes,
-          }
-        })
-
-        // Сортируем кейсы: сначала стартовый, потом остальные по стоимости
-        const sortedCases = processedCases.sort((a, b) => {
-          if (a.name.toLowerCase().includes("стартовый")) return -1
-          if (b.name.toLowerCase().includes("стартовый")) return 1
-          return a.cost - b.cost
-        })
-
+        const processedCases = this.processCasesData(cases)
+        const sortedCases = this.sortCases(processedCases)
         renderCases(sortedCases, (caseData) => gameManager.openCasePage(caseData))
       }
     } catch (error) {
       console.error("❌ Ошибка загрузки данных:", error)
       showNotification("❌ Ошибка загрузки данных", "error", 5000)
     }
+  }
+
+  processCasesData(cases) {
+    return cases.map((caseData) => {
+      const name = caseData.name.toLowerCase()
+
+      // Определяем иконку в зависимости от названия
+      let icon = "⭐"
+
+      if (name.includes("стартовый")) {
+        icon = "🟢"
+      } else if (name.includes("премиум")) {
+        icon = "🟡"
+      } else if (name.includes("vip") || name.includes("вип")) {
+        icon = "🔴"
+      }
+
+      // Адаптируемся под серверный формат
+      let possible_prizes = []
+
+      // Если есть presents с сервера (основной формат), конвертируем их
+      if (caseData.presents && caseData.presents.length) {
+        possible_prizes = caseData.presents.map((present) => ({
+          name: `${present.cost} фантиков`,
+          cost: present.cost,
+          icon: "💎",
+          probability: present.probability || 10,
+          chance: present.probability || 10,
+        }))
+      }
+      // Если уже есть possible_prizes, используем их
+      else if (caseData.possible_prizes && caseData.possible_prizes.length) {
+        possible_prizes = caseData.possible_prizes
+      }
+      // Если ничего нет, генерируем базовые призы
+      else {
+        possible_prizes = this.generateDefaultPrizes(caseData.cost)
+      }
+
+      return {
+        ...caseData,
+        icon: icon,
+        possible_prizes: possible_prizes,
+      }
+    })
+  }
+
+  generateDefaultPrizes(caseCost) {
+    if (caseCost <= 100) {
+      // Стартовый кейс
+      return [
+        { name: "50 фантиков", cost: 50, icon: "💎", chance: 40 },
+        { name: "100 фантиков", cost: 100, icon: "💎", chance: 35 },
+        { name: "200 фантиков", cost: 200, icon: "💎", chance: 20 },
+        { name: "500 фантиков", cost: 500, icon: "💎", chance: 5 },
+      ]
+    } else if (caseCost <= 500) {
+      // Премиум кейс
+      return [
+        { name: "200 фантиков", cost: 200, icon: "💎", chance: 30 },
+        { name: "500 фантиков", cost: 500, icon: "💎", chance: 35 },
+        { name: "1000 фантиков", cost: 1000, icon: "💎", chance: 25 },
+        { name: "2500 фантиков", cost: 2500, icon: "💎", chance: 10 },
+      ]
+    } else {
+      // VIP кейс
+      return [
+        { name: "1000 фантиков", cost: 1000, icon: "💎", chance: 25 },
+        { name: "2000 фантиков", cost: 2000, icon: "💎", chance: 35 },
+        { name: "5000 фантиков", cost: 5000, icon: "💎", chance: 30 },
+        { name: "10000 фантиков", cost: 10000, icon: "💎", chance: 10 },
+      ]
+    }
+  }
+
+  sortCases(cases) {
+    return cases.sort((a, b) => {
+      if (a.name.toLowerCase().includes("стартовый")) return -1
+      if (b.name.toLowerCase().includes("стартовый")) return 1
+      return a.cost - b.cost
+    })
   }
 
   setupEventListeners() {
@@ -134,6 +160,23 @@ class App {
     // Кнопка топапа
     document.getElementById("topupBtn")?.addEventListener("click", () => {
       paymentManager.openTopupModal()
+    })
+
+    // Обновление баланса по клику
+    document.querySelectorAll("#userStars, #userStarsCase").forEach((element) => {
+      element?.addEventListener("click", async () => {
+        try {
+          const fantics = await apiManager.fetchUserFantics()
+          if (fantics !== null) {
+            STATE.userFantics = fantics
+            updateFanticsDisplay()
+            showNotification("💎 Баланс обновлен", "success", 1000)
+          }
+        } catch (error) {
+          console.error("Ошибка обновления баланса:", error)
+          showNotification("❌ Ошибка обновления баланса", "error", 2000)
+        }
+      })
     })
 
     // Очистка при закрытии страницы
