@@ -269,7 +269,6 @@ export class GameManager {
 
           setTimeout(() => {
             const prizeName = result.prize?.name || `${winningCost} фантиков`
-            showNotification(`🎉 Поздравляем! Вы выиграли ${prizeName}!`, "success", 5000)
             resolve()
           }, 800)
         }
