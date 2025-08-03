@@ -67,9 +67,10 @@ class App {
 
   setupEventListeners() {
     // Кнопка пополнения
-    document.getElementById("depositBtn")?.addEventListener("click", () => {
-      paymentManager.openDepositModal()
-    })
+   document.getElementById("depositBtn")?.addEventListener("click", () => {
+  console.log("🔄 Открытие Topup Modal вместо Deposit Modal")
+  paymentManager.openTopupModal()
+})
 
     // Кнопка топапа
     document.getElementById("topupBtn")?.addEventListener("click", () => {
