@@ -8,15 +8,24 @@ export const CONFIG = {
   })(),
 
   ANIMATION: {
-    SPIN_DURATION: 6000,
-    PRIZE_WIDTH: 144,
+    SPIN_DURATION: 8000, // 8 секунд медленной прокрутки
+    PRIZE_WIDTH: 144, // 128px + 16px gap
     NOTIFICATION_DURATION: 3000,
   },
 
-  DEPOSIT_AMOUNTS: [10, 50, 100, 500, 1000, 5000],
+  TOPUP: {
+    MIN_AMOUNT: 1,
+    MAX_AMOUNT: 100000,
+    DEFAULT_AMOUNT: 10,
+  },
 
   RATE_LIMITS: {
     MAX_CASES_PER_MINUTE: 10,
+  },
+
+  TON: {
+    TESTNET: true,
+    TRANSACTION_TIMEOUT: 600, // 10 minutes
   },
 }
 
@@ -27,7 +36,6 @@ export const STATE = {
   currentCase: null,
   isSpinning: false,
   userFantics: 0,
-  selectedDepositAmount: null,
   topupPayload: null,
 }
 
