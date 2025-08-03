@@ -1,5 +1,5 @@
 // Модуль игровой логики
-import { CONFIG, STATE } from "./config.js"
+import { STATE } from "./config.js"
 import { apiManager } from "./api.js"
 import { showNotification, updateFanticsDisplay, renderPossiblePrizes } from "./ui.js"
 
@@ -20,30 +20,55 @@ export class GameManager {
 
     prizeScroll.innerHTML = ""
 
+    // Создаем массив призов для прокрутки (больше элементов для плавности)
     const prizes = []
+    const baseRepeats = 50 // Увеличиваем количество повторений
 
     if (caseData.possible_prizes) {
+      // Создаем базовый набор призов
+      const basePrizes = []
       caseData.possible_prizes.forEach((prize) => {
-        for (let i = 0; i < prize.chance; i++) {
-          prizes.push(prize)
+        const repeats = Math.max(1, Math.floor(prize.chance / 2)) // Меньше повторений для разнообразия
+        for (let i = 0; i < repeats; i++) {
+          basePrizes.push(prize)
         }
       })
+
+      // Перемешиваем базовый набор
+      for (let i = basePrizes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[basePrizes[i], basePrizes[j]] = [basePrizes[j], basePrizes[i]]
+      }
+
+      // Создаем длинную последовательность
+      for (let i = 0; i < baseRepeats; i++) {
+        basePrizes.forEach((prize) => prizes.push({ ...prize }))
+      }
     }
 
-    // Перемешиваем призы
-    for (let i = prizes.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[prizes[i], prizes[j]] = [prizes[j], prizes[i]]
-    }
-
-    prizes.forEach((prize) => {
+    // Рендерим призы
+    prizes.forEach((prize, index) => {
       const prizeElement = document.createElement("div")
-      prizeElement.className =
-        "flex-shrink-0 w-32 h-32 bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg flex flex-col items-center justify-center text-white shadow-lg border border-purple-500/30"
+
+      // Определяем цвет в зависимости от стоимости
+      let bgGradient = "from-purple-600 to-purple-800"
+      if (prize.cost >= 2000) {
+        bgGradient = "from-yellow-600 to-yellow-800"
+      } else if (prize.cost >= 1000) {
+        bgGradient = "from-purple-600 to-purple-800"
+      } else if (prize.cost >= 200) {
+        bgGradient = "from-blue-600 to-blue-800"
+      } else {
+        bgGradient = "from-green-600 to-green-800"
+      }
+
+      prizeElement.className = `flex-shrink-0 w-32 h-32 bg-gradient-to-br ${bgGradient} rounded-lg flex flex-col items-center justify-center text-white shadow-lg border border-purple-500/30`
+      prizeElement.dataset.prizeIndex = index
+      prizeElement.dataset.prizeCost = prize.cost
 
       const iconElement = document.createElement("div")
       iconElement.className = "text-3xl mb-2"
-      iconElement.textContent = prize.icon || "🎁"
+      iconElement.textContent = prize.icon || "💎"
 
       const nameElement = document.createElement("div")
       nameElement.className = "text-sm font-semibold text-center"
@@ -59,6 +84,9 @@ export class GameManager {
 
       prizeScroll.appendChild(prizeElement)
     })
+
+    // Сбрасываем позицию прокрутки
+    prizeScroll.scrollLeft = 0
   }
 
   updateOpenButton() {
@@ -113,14 +141,27 @@ export class GameManager {
     openBtn.classList.add("animate-pulse")
 
     try {
-      const result = await apiManager.openCaseAPI(STATE.currentCase.id)
+      let result
 
-      if (!result) {
-        throw new Error("Не удалось открыть кейс")
+      if (demoMode.checked) {
+        // Демо режим - симулируем результат
+        const prizes = STATE.currentCase.possible_prizes || []
+        const randomPrize = prizes[Math.floor(Math.random() * prizes.length)]
+        result = {
+          gift: randomPrize.cost,
+          prize: randomPrize,
+          new_balance: STATE.userFantics,
+          message: "Демо режим",
+        }
+      } else {
+        // Реальное открытие кейса
+        result = await apiManager.openCaseAPI(STATE.currentCase.id)
+        if (!result) {
+          throw new Error("Не удалось открыть кейс")
+        }
+        STATE.userFantics = result.new_balance || STATE.userFantics
+        updateFanticsDisplay()
       }
-
-      STATE.userFantics = result.new_balance || STATE.userFantics
-      updateFanticsDisplay()
 
       // Анимация вращения
       await this.animatePrizeScroll(result)
@@ -139,44 +180,98 @@ export class GameManager {
     const prizeScroll = document.getElementById("prizeScroll")
     if (!prizeScroll) return
 
-    const scrollWidth = prizeScroll.scrollWidth
+    const prizeElements = Array.from(prizeScroll.children)
+    const prizeWidth = 128 + 16 // 128px ширина + 16px gap
     const containerWidth = prizeScroll.parentElement.offsetWidth
-    const centerPosition = scrollWidth / 2 - containerWidth / 2
+    const centerOffset = containerWidth / 2 - 64 // Центрируем относительно середины приза
 
-    const winningPrize = result.prize
-    let targetPosition = centerPosition
+    // Находим подходящий приз для остановки
+    let targetPrizeIndex = -1
+    const winningCost = result.gift || result.prize?.cost
 
-    if (winningPrize) {
-      const prizeElements = prizeScroll.children
-      for (let i = 0; i < prizeElements.length; i++) {
-        const prizeElement = prizeElements[i]
-        const prizeName = prizeElement.querySelector("div:nth-child(2)")?.textContent
-        if (prizeName === winningPrize.name) {
-          targetPosition = centerPosition + i * CONFIG.ANIMATION.PRIZE_WIDTH
+    if (winningCost) {
+      // Ищем призы с подходящей стоимостью в последней трети списка
+      const startSearchFrom = Math.floor(prizeElements.length * 0.7)
+
+      for (let i = startSearchFrom; i < prizeElements.length; i++) {
+        const prizeCost = Number.parseInt(prizeElements[i].dataset.prizeCost)
+        if (prizeCost === winningCost) {
+          targetPrizeIndex = i
           break
         }
       }
     }
 
+    // Если не нашли подходящий приз, выбираем случайный в конце
+    if (targetPrizeIndex === -1) {
+      targetPrizeIndex =
+        Math.floor(prizeElements.length * 0.75) + Math.floor(Math.random() * Math.floor(prizeElements.length * 0.2))
+    }
+
+    // Вычисляем целевую позицию
+    const targetPosition = targetPrizeIndex * prizeWidth - centerOffset
+
+    // Добавляем дополнительные обороты для эффектности
+    const extraSpins = 3
+    const finalTargetPosition = targetPosition + extraSpins * prizeElements.length * prizeWidth
+
     return new Promise((resolve) => {
       const startTime = performance.now()
-      const duration = CONFIG.ANIMATION.SPIN_DURATION
+      const duration = 6000 // Увеличиваем длительность до 6 секунд
       const startPosition = prizeScroll.scrollLeft
+
+      // Улучшенная функция замедления (более плавная)
+      const easeOutQuart = (t) => {
+        return 1 - Math.pow(1 - t, 4)
+      }
+
+      // Дополнительная функция для очень плавного замедления в конце
+      const smoothEnd = (t) => {
+        if (t < 0.8) {
+          return easeOutQuart(t / 0.8) * 0.95
+        } else {
+          // Очень медленное замедление в последние 20%
+          const endProgress = (t - 0.8) / 0.2
+          return 0.95 + 0.05 * (1 - Math.pow(1 - endProgress, 6))
+        }
+      }
 
       const animateScroll = (currentTime) => {
         const elapsed = currentTime - startTime
         const progress = Math.min(elapsed / duration, 1)
 
-        const easeOut = 1 - Math.pow(1 - progress, 3)
-        prizeScroll.scrollLeft = startPosition + (targetPosition - startPosition) * easeOut
+        // Применяем улучшенную функцию замедления
+        const easedProgress = smoothEnd(progress)
+
+        const currentPosition = startPosition + (finalTargetPosition - startPosition) * easedProgress
+        prizeScroll.scrollLeft = currentPosition
+
+        // Добавляем эффект подсветки приближающегося к центру приза
+        const currentCenterPosition = currentPosition + centerOffset
+        const currentPrizeIndex = Math.round(currentCenterPosition / prizeWidth)
+
+        // Убираем предыдущую подсветку
+        prizeElements.forEach((el) => el.classList.remove("prize-highlight"))
+
+        // Подсвечиваем текущий приз в центре
+        if (prizeElements[currentPrizeIndex]) {
+          prizeElements[currentPrizeIndex].classList.add("prize-highlight")
+        }
 
         if (progress < 1) {
           requestAnimationFrame(animateScroll)
         } else {
+          // Финальная подсветка выигрышного приза
+          prizeElements.forEach((el) => el.classList.remove("prize-highlight"))
+          if (prizeElements[targetPrizeIndex]) {
+            prizeElements[targetPrizeIndex].classList.add("prize-winner")
+          }
+
           setTimeout(() => {
-            showNotification(`🎉 Поздравляем! Вы выиграли ${winningPrize?.name || "приз"}!`, "success", 5000)
+            const prizeName = result.prize?.name || `${winningCost} фантиков`
+            showNotification(`🎉 Поздравляем! Вы выиграли ${prizeName}!`, "success", 5000)
             resolve()
-          }, 500)
+          }, 800)
         }
       }
 
