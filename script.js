@@ -55,12 +55,64 @@ class App {
       // Загружаем кейсы
       const cases = await apiManager.fetchCases()
       if (cases) {
+        // Обрабатываем кейсы: добавляем иконки и призы
+        const processedCases = cases.map((caseData) => {
+          const name = caseData.name.toLowerCase()
+
+          // Определяем иконку в зависимости от названия
+          let icon = "⭐"
+
+          if (name.includes("стартовый")) {
+            icon = "🟢" // Зеленая звездочка
+          } else if (name.includes("премиум")) {
+            icon = "🟡" // Желтая звездочка
+          } else if (name.includes("vip") || name.includes("вип")) {
+            icon = "🔴" // Красная звездочка
+          }
+
+          // Создаем призы если их нет
+          let possible_prizes = caseData.possible_prizes || []
+
+          if (!possible_prizes.length) {
+            // Генерируем призы в зависимости от стоимости кейса
+            if (caseData.cost <= 100) {
+              // Стартовый кейс
+              possible_prizes = [
+                { name: "50 фантиков", cost: 50, icon: "💎", chance: 40 },
+                { name: "100 фантиков", cost: 100, icon: "💎", chance: 35 },
+                { name: "200 фантиков", cost: 200, icon: "💎", chance: 20 },
+                { name: "500 фантиков", cost: 500, icon: "💎", chance: 5 },
+              ]
+            } else if (caseData.cost <= 500) {
+              // Премиум кейс
+              possible_prizes = [
+                { name: "200 фантиков", cost: 200, icon: "💎", chance: 30 },
+                { name: "500 фантиков", cost: 500, icon: "💎", chance: 35 },
+                { name: "1000 фантиков", cost: 1000, icon: "💎", chance: 25 },
+                { name: "2500 фантиков", cost: 2500, icon: "💎", chance: 10 },
+              ]
+            } else {
+              // VIP кейс
+              possible_prizes = [
+                { name: "1000 фантиков", cost: 1000, icon: "💎", chance: 25 },
+                { name: "2000 фантиков", cost: 2000, icon: "💎", chance: 35 },
+                { name: "5000 фантиков", cost: 5000, icon: "💎", chance: 30 },
+                { name: "10000 фантиков", cost: 10000, icon: "💎", chance: 10 },
+              ]
+            }
+          }
+
+          return {
+            ...caseData,
+            icon: icon,
+            possible_prizes: possible_prizes,
+          }
+        })
+
         // Сортируем кейсы: сначала стартовый, потом остальные по стоимости
-        const sortedCases = cases.sort((a, b) => {
-          // Если один из кейсов стартовый - он идет первым
+        const sortedCases = processedCases.sort((a, b) => {
           if (a.name.toLowerCase().includes("стартовый")) return -1
           if (b.name.toLowerCase().includes("стартовый")) return 1
-          // Остальные сортируем по стоимости
           return a.cost - b.cost
         })
 
@@ -83,9 +135,6 @@ class App {
     document.getElementById("topupBtn")?.addEventListener("click", () => {
       paymentManager.openTopupModal()
     })
-
-    // Убираем обработчик для кнопки подключения TON кошелька
-    // так как теперь используется только TON Connect UI
 
     // Очистка при закрытии страницы
     window.addEventListener("beforeunload", () => this.cleanup())
