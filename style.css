@@ -110,6 +110,85 @@
   transition: none;
 }
 
+/* Анимация появления призов */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#possiblePrizes > div {
+  animation: fadeInUp 0.5s ease forwards;
+  opacity: 0;
+}
+
+/* Улучшенные кнопки */
+.btn-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Анимация загрузки */
+.loading-spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Дополнительные улучшения */
+.case-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.prize-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.prize-card:hover {
+  transform: translateY(-2px) scale(1.02);
+}
+
+/* Анимация для кнопок */
+.btn-animate {
+  transition: all 0.2s ease;
+}
+
+.btn-animate:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-animate:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  #prizeScroll > div {
+    width: 120px;
+    height: 120px;
+  }
+}
+
 /* Стили для TON Connect UI */
 #ton-connect-ui {
   margin-bottom: 1rem;
