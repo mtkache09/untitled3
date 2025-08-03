@@ -92,9 +92,8 @@ export function renderCases(cases, onCaseSelect) {
 
     caseElement.innerHTML = `
       <div class="text-center">
-        <div class="text-3xl mb-2">${caseData.icon || "📦"}</div>
+        <div class="text-4xl mb-2">${caseData.icon || "📦"}</div>
         <h3 class="font-bold text-lg mb-2">${caseData.name}</h3>
-        <p class="text-sm text-purple-200 mb-3">${caseData.description}</p>
         <div class="flex items-center justify-center gap-2">
           <span class="text-purple-300">${caseData.cost}</span>
           <span class="text-xl">💎</span>
@@ -113,17 +112,34 @@ export function renderPossiblePrizes(caseData) {
 
   possiblePrizes.innerHTML = ""
 
-  caseData.possible_prizes.forEach((prize) => {
+  caseData.possible_prizes.forEach((prize, index) => {
     const prizeElement = document.createElement("div")
-    prizeElement.className =
-      "bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg p-3 text-white text-center shadow-lg border border-purple-500/30"
+    
+    // Определяем цвет в зависимости от стоимости приза
+    let bgGradient = ""
+    
+    if (prize.cost >= 2000) {
+      bgGradient = "from-yellow-600 to-yellow-800" // Золотой для очень дорогих
+    } else if (prize.cost >= 1000) {
+      bgGradient = "from-purple-600 to-purple-800" // Фиолетовый для дорогих
+    } else if (prize.cost >= 200) {
+      bgGradient = "from-blue-600 to-blue-800" // Синий для средних
+    } else {
+      bgGradient = "from-green-600 to-green-800" // Зеленый для дешевых
+    }
+
+    prizeElement.className = `bg-gradient-to-br ${bgGradient} rounded-lg p-3 text-white text-center shadow-lg border border-purple-500/30 hover:scale-105 transition-all duration-300`
 
     prizeElement.innerHTML = `
-      <div class="text-2xl mb-1">${prize.icon || "🎁"}</div>
+      <div class="text-2xl mb-1">${prize.icon || "💎"}</div>
       <div class="text-xs font-semibold">${prize.name}</div>
-      <div class="text-xs text-purple-300">${prize.cost} 💎</div>
+      <div class="text-xs text-gray-300 mt-1">${prize.chance ? `${prize.chance}%` : "Редкий"}</div>
     `
+
+    // Добавляем задержку анимации для каждого приза
+    prizeElement.style.animationDelay = `${index * 0.1}s`
 
     possiblePrizes.appendChild(prizeElement)
   })
+
 }
