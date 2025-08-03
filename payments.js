@@ -11,7 +11,7 @@ export class PaymentManager {
 
   setupEventListeners() {
     // Deposit modal
-    document.getElementById("depositBtn")?.addEventListener("click", () => this.openDepositModal())
+    document.getElementById("depositBtn")?.addEventListener("click", () => this.openTopupModal())
     document.getElementById("closeDepositModal")?.addEventListener("click", () => this.closeDepositModal())
     document.getElementById("confirmDepositBtn")?.addEventListener("click", () => this.processDeposit())
     document.getElementById("customAmount")?.addEventListener("input", () => this.updateDepositButton())
