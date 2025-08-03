@@ -13,10 +13,8 @@ class App {
   async init() {
     try {
       // Показываем предупреждение если нет авторизации
-      if (!telegramManager.isAuthAvailable()) {
-        showNotification("⚠️ Для полной функциональности откройте в Telegram", "info", 8000)
-      } else {
-        showNotification("✅ Приложение загружено", "success", 2000)
+     if (!telegramManager.isAuthAvailable()) {
+  showNotification("⚠️ Для полной функциональности откройте в Telegram", "info", 8000)
       }
 
       // Запускаем тест соединения для отладки
