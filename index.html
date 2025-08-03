@@ -70,6 +70,13 @@
     .notification {
       transition: all 0.3s ease;
     }
+
+    /* Центрирование TON Connect */
+    #ton-connect-ui {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
   </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-black via-gray-900 to-purple-900">
@@ -115,8 +122,10 @@
           </button>
       </div>
 
-      <!-- TON Connect UI Container (только этот элемент для подключения кошелька) -->
-      <div id="ton-connect-ui" class="mb-6"></div>
+      <!-- TON Connect UI Container (отцентрированный) -->
+      <div class="mb-6 flex justify-center">
+          <div id="ton-connect-ui"></div>
+      </div>
 
       <!-- Cases Section -->
       <div class="mb-6">
