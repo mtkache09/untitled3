@@ -60,16 +60,15 @@ class App {
           const name = caseData.name.toLowerCase()
 
           // Определяем иконку в зависимости от названия
-          let iconUrl = "/images/starter-case-icon.png" // По умолчанию стартовый
+         let iconUrl = "images/starter-case-icon.png" // По умолчанию стартовый (убираем слеш)
 
-          if (name.includes("стартовый") || name.includes("starter")) {
-            iconUrl = "/images/starter-case-icon.png"
-          } else if (name.includes("премиум") || name.includes("premium")) {
-            iconUrl = "/images/premium-case-icon.png"
-          } else if (name.includes("vip") || name.includes("вип")) {
-            iconUrl = "/images/vip-case-icon.png"
-          }
-
+        if (name.includes("стартовый") || name.includes("starter")) {
+  iconUrl = "images/starter-case-icon.png"  // убираем слеш
+} else if (name.includes("премиум") || name.includes("premium")) {
+  iconUrl = "images/premium-case-icon.png"  // убираем слеш
+} else if (name.includes("vip") || name.includes("вип")) {
+  iconUrl = "images/vip-case-icon.png"     // убираем слеш
+}
           // Создаем призы если их нет
           let possible_prizes = caseData.possible_prizes || []
 
