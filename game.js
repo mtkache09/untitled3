@@ -1,5 +1,5 @@
-// Исправленный модуль игровой логики (адаптированный под существующий API)
-import { CONFIG, STATE } from "./config.js"
+// Модуль игровой логики
+import { STATE } from "./config.js"
 import { apiManager } from "./api.js"
 import { showNotification, updateFanticsDisplay, renderPossiblePrizes } from "./ui.js"
 
@@ -14,72 +14,64 @@ export class GameManager {
     document.getElementById("demoMode")?.addEventListener("change", () => this.updateOpenButton())
   }
 
-  renderPrizeScroll(caseData, winningGiftCost = 0) {
+  renderPrizeScroll(caseData, winningGiftCost) {
     const prizeScroll = document.getElementById("prizeScroll")
     if (!prizeScroll || !caseData) return
 
     prizeScroll.innerHTML = ""
 
-    // Адаптируемся под серверный формат - используем presents если нет possible_prizes
-    let possiblePrizes = caseData.possible_prizes || []
-
-    // Если нет possible_prizes, создаем их из presents (серверный формат)
-    if (!possiblePrizes.length && caseData.presents) {
-      possiblePrizes = caseData.presents.map((present) => ({
-        name: `${present.cost} фантиков`,
-        cost: present.cost,
-        icon: "💎",
-        probability: present.probability || 10,
-        chance: present.probability || 10,
-      }))
-    }
-
-    // Если все еще нет данных, генерируем базовые призы
-    if (!possiblePrizes.length) {
-      possiblePrizes = this.generateDefaultPrizes(caseData.cost)
-    }
-
+    // Создаем массив призов для прокрутки (больше элементов для плавности)
     const prizes = []
+    const baseRepeats = 50 // Увеличиваем количество повторений
 
-    // Создаем массив призов с учетом их вероятности
-    possiblePrizes.forEach((prize) => {
-      const probability = prize.chance || prize.probability || 10
-      const weight = Math.max(1, Math.floor(probability))
+    if (caseData.possible_prizes) {
+      // Создаем базовый набор призов
+      const basePrizes = []
+      caseData.possible_prizes.forEach((prize) => {
+        const repeats = Math.max(1, Math.floor(prize.chance / 2)) // Меньше повторений для разнообразия
+        for (let i = 0; i < repeats; i++) {
+          basePrizes.push(prize)
+        }
+      })
 
-      for (let i = 0; i < weight; i++) {
-        prizes.push({
-          name: prize.name || `${prize.cost} фантиков`,
-          cost: prize.cost || 0,
-          icon: prize.icon || "💎",
-        })
+      // Перемешиваем базовый набор
+      for (let i = basePrizes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[basePrizes[i], basePrizes[j]] = [basePrizes[j], basePrizes[i]]
       }
-    })
 
-    // Перемешиваем призы
-    for (let i = prizes.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[prizes[i], prizes[j]] = [prizes[j], prizes[i]]
+      // Создаем длинную последовательность
+      for (let i = 0; i < baseRepeats; i++) {
+        basePrizes.forEach((prize) => prizes.push({ ...prize }))
+      }
     }
 
-    // Добавляем дополнительные призы для создания эффекта бесконечности
-    const extendedPrizes = [...prizes, ...prizes, ...prizes]
-
-    extendedPrizes.forEach((prize, index) => {
+    // Рендерим призы
+    prizes.forEach((prize, index) => {
       const prizeElement = document.createElement("div")
-      prizeElement.className =
-        "flex-shrink-0 w-32 h-32 bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg flex flex-col items-center justify-center text-white shadow-lg border border-purple-500/30 transition-all duration-300"
 
-      // Добавляем data-атрибуты для идентификации
-      prizeElement.dataset.prizeName = prize.name
+      // Определяем цвет в зависимости от стоимости
+      let bgGradient = "from-purple-600 to-purple-800"
+      if (prize.cost >= 2000) {
+        bgGradient = "from-yellow-600 to-yellow-800"
+      } else if (prize.cost >= 1000) {
+        bgGradient = "from-purple-600 to-purple-800"
+      } else if (prize.cost >= 200) {
+        bgGradient = "from-blue-600 to-blue-800"
+      } else {
+        bgGradient = "from-green-600 to-green-800"
+      }
+
+      prizeElement.className = `flex-shrink-0 w-32 h-32 bg-gradient-to-br ${bgGradient} rounded-lg flex flex-col items-center justify-center text-white shadow-lg border border-purple-500/30`
+      prizeElement.dataset.prizeIndex = index
       prizeElement.dataset.prizeCost = prize.cost
-      prizeElement.dataset.index = index
 
       const iconElement = document.createElement("div")
       iconElement.className = "text-3xl mb-2"
-      iconElement.textContent = prize.icon
+      iconElement.textContent = prize.icon || "💎"
 
       const nameElement = document.createElement("div")
-      nameElement.className = "text-sm font-semibold text-center px-1"
+      nameElement.className = "text-sm font-semibold text-center"
       nameElement.textContent = prize.name
 
       const costElement = document.createElement("div")
@@ -92,31 +84,9 @@ export class GameManager {
 
       prizeScroll.appendChild(prizeElement)
     })
-  }
 
-  generateDefaultPrizes(caseCost) {
-    if (caseCost <= 100) {
-      return [
-        { name: "50 фантиков", cost: 50, icon: "💎", chance: 40 },
-        { name: "100 фантиков", cost: 100, icon: "💎", chance: 35 },
-        { name: "200 фантиков", cost: 200, icon: "💎", chance: 20 },
-        { name: "500 фантиков", cost: 500, icon: "💎", chance: 5 },
-      ]
-    } else if (caseCost <= 500) {
-      return [
-        { name: "200 фантиков", cost: 200, icon: "💎", chance: 30 },
-        { name: "500 фантиков", cost: 500, icon: "💎", chance: 35 },
-        { name: "1000 фантиков", cost: 1000, icon: "💎", chance: 25 },
-        { name: "2500 фантиков", cost: 2500, icon: "💎", chance: 10 },
-      ]
-    } else {
-      return [
-        { name: "1000 фантиков", cost: 1000, icon: "💎", chance: 25 },
-        { name: "2000 фантиков", cost: 2000, icon: "💎", chance: 35 },
-        { name: "5000 фантиков", cost: 5000, icon: "💎", chance: 30 },
-        { name: "10000 фантиков", cost: 10000, icon: "💎", chance: 10 },
-      ]
-    }
+    // Сбрасываем позицию прокрутки
+    prizeScroll.scrollLeft = 0
   }
 
   updateOpenButton() {
@@ -129,17 +99,13 @@ export class GameManager {
     if (demoMode.checked) {
       openBtn.disabled = false
       openBtnText.textContent = "Открыть кейс (Демо)"
-      openBtn.className = openBtn.className.replace("bg-gray-500", "bg-purple-600")
     } else {
-      const caseCost = STATE.currentCase?.cost || 0
-      if (STATE.userFantics >= caseCost) {
+      if (STATE.userFantics >= (STATE.currentCase?.cost || 0)) {
         openBtn.disabled = false
-        openBtnText.textContent = `Открыть кейс (${caseCost} 💎)`
-        openBtn.className = openBtn.className.replace("bg-gray-500", "bg-purple-600")
+        openBtnText.textContent = `Открыть кейс (${STATE.currentCase?.cost || 0} 💎)`
       } else {
         openBtn.disabled = true
         openBtnText.textContent = "Недостаточно фантиков"
-        openBtn.className = openBtn.className.replace("bg-purple-600", "bg-gray-500")
       }
     }
   }
@@ -149,14 +115,10 @@ export class GameManager {
     document.getElementById("mainPage")?.classList.add("hidden")
     document.getElementById("casePage")?.classList.remove("hidden")
 
-    // Обновляем заголовок и баланс
-    const caseTitle = document.getElementById("caseTitle")
-    const userStarsCase = document.getElementById("userStarsCase")
+    document.getElementById("caseTitle").textContent = caseData.name
+    document.getElementById("userStarsCase").textContent = STATE.userFantics
 
-    if (caseTitle) caseTitle.textContent = caseData.name
-    if (userStarsCase) userStarsCase.textContent = STATE.userFantics
-
-    this.renderPrizeScroll(caseData)
+    this.renderPrizeScroll(caseData, 0)
     renderPossiblePrizes(caseData)
     this.updateOpenButton()
   }
@@ -169,9 +131,7 @@ export class GameManager {
 
     if (!openBtn || !demoMode) return
 
-    const caseCost = STATE.currentCase?.cost || 0
-
-    if (!demoMode.checked && STATE.userFantics < caseCost) {
+    if (!demoMode.checked && STATE.userFantics < (STATE.currentCase?.cost || 0)) {
       showNotification("Недостаточно фантиков для открытия кейса", "warning")
       return
     }
@@ -185,28 +145,26 @@ export class GameManager {
 
       if (demoMode.checked) {
         // Демо режим - симулируем результат
-        result = this.simulateDemoResult()
-        showNotification("🎮 Демо режим - баланс не изменился", "info", 2000)
-      } else {
-        // Реальное открытие кейса - используем существующий API
-        const serverResult = await apiManager.openCaseAPI(STATE.currentCase.id)
-        if (!serverResult) {
-          throw new Error("Не удалось открыть ��ейс")
+        const prizes = STATE.currentCase.possible_prizes || []
+        const randomPrize = prizes[Math.floor(Math.random() * prizes.length)]
+        result = {
+          gift: randomPrize.cost,
+          prize: randomPrize,
+          new_balance: STATE.userFantics,
+          message: "Демо режим",
         }
-
-        // Обновляем баланс
-        STATE.userFantics = serverResult.new_balance || STATE.userFantics
+      } else {
+        // Реальное открытие кейса
+        result = await apiManager.openCaseAPI(STATE.currentCase.id)
+        if (!result) {
+          throw new Error("Не удалось открыть кейс")
+        }
+        STATE.userFantics = result.new_balance || STATE.userFantics
         updateFanticsDisplay()
-
-        // Адаптируем серверный ответ под клиентский формат
-        result = this.adaptServerResponse(serverResult)
       }
 
       // Анимация вращения
       await this.animatePrizeScroll(result)
-
-      // Сохраняем последний результат
-      STATE.lastOpenedCase = result
     } catch (error) {
       console.error("❌ Ошибка при открытии кейса:", error)
       showNotification("❌ Ошибка при открытии кейса", "error")
@@ -218,142 +176,107 @@ export class GameManager {
     }
   }
 
-  simulateDemoResult() {
-    // Получаем призы из текущего кейса
-    let possiblePrizes = STATE.currentCase.possible_prizes || []
-
-    if (!possiblePrizes.length && STATE.currentCase.presents) {
-      possiblePrizes = STATE.currentCase.presents.map((present) => ({
-        name: `${present.cost} фантиков`,
-        cost: present.cost,
-        icon: "💎",
-      }))
-    }
-
-    if (!possiblePrizes.length) {
-      possiblePrizes = this.generateDefaultPrizes(STATE.currentCase.cost)
-    }
-
-    const randomPrize = possiblePrizes[Math.floor(Math.random() * possiblePrizes.length)]
-
-    return {
-      prize: randomPrize,
-      new_balance: STATE.userFantics,
-      spent: 0,
-      profit: randomPrize?.cost || 0,
-    }
-  }
-
-  adaptServerResponse(serverResult) {
-    // Адаптируем ответ сервера под клиентский формат
-    // Сервер возвращает: { gift, case_id, spent, profit, new_balance, message }
-    return {
-      prize: {
-        name: `${serverResult.gift} фантиков`,
-        cost: serverResult.gift || 0,
-        icon: "💎",
-      },
-      new_balance: serverResult.new_balance,
-      spent: serverResult.spent || 0,
-      profit: serverResult.profit || 0,
-      message: serverResult.message,
-    }
-  }
-
   async animatePrizeScroll(result) {
     const prizeScroll = document.getElementById("prizeScroll")
-    if (!prizeScroll || !result?.prize) return
+    if (!prizeScroll) return
 
-    const containerWidth = prizeScroll.parentElement.offsetWidth
-    const prizeWidth = CONFIG.ANIMATION.PRIZE_WIDTH
-    const centerOffset = containerWidth / 2 - prizeWidth / 2
-
-    // Находим подходящий приз в скролле
     const prizeElements = Array.from(prizeScroll.children)
-    let targetIndex = Math.floor(prizeElements.length / 2) // По умолчанию центр
+    const prizeWidth = 128 + 16 // 128px ширина + 16px gap
+    const containerWidth = prizeScroll.parentElement.offsetWidth
+    const centerOffset = containerWidth / 2 - 64 // Центрируем относительно середины приза
 
-    // Ищем приз с таким же названием или стоимостью
-    const foundIndex = prizeElements.findIndex((element) => {
-      const elementName = element.dataset.prizeName
-      const elementCost = Number.parseInt(element.dataset.prizeCost)
-      return elementName === result.prize.name || elementCost === result.prize.cost
-    })
+    // Находим подходящий приз для остановки
+    let targetPrizeIndex = -1
+    const winningCost = result.gift || result.prize?.cost
 
-    if (foundIndex !== -1) {
-      targetIndex = foundIndex
+    if (winningCost) {
+      // Ищем призы с подходящей стоимостью в последней трети списка
+      const startSearchFrom = Math.floor(prizeElements.length * 0.7)
+
+      for (let i = startSearchFrom; i < prizeElements.length; i++) {
+        const prizeCost = Number.parseInt(prizeElements[i].dataset.prizeCost)
+        if (prizeCost === winningCost) {
+          targetPrizeIndex = i
+          break
+        }
+      }
     }
 
-    // Рассчитываем финальную позицию
-    const targetPosition = targetIndex * prizeWidth - centerOffset
+    // Если не нашли подходящий приз, выбираем случайный в конце
+    if (targetPrizeIndex === -1) {
+      targetPrizeIndex =
+        Math.floor(prizeElements.length * 0.75) + Math.floor(Math.random() * Math.floor(prizeElements.length * 0.2))
+    }
+
+    // Вычисляем целевую позицию
+    const targetPosition = targetPrizeIndex * prizeWidth - centerOffset
+
+    // Добавляем дополнительные обороты для эффектности
+    const extraSpins = 3
+    const finalTargetPosition = targetPosition + extraSpins * prizeElements.length * prizeWidth
 
     return new Promise((resolve) => {
       const startTime = performance.now()
-      const duration = CONFIG.ANIMATION.SPIN_DURATION
+      const duration = 6000 // Увеличиваем длительность до 6 секунд
       const startPosition = prizeScroll.scrollLeft
 
-      // Добавляем дополнительные обороты для эффектности
-      const extraSpins =
-        Math.random() * (CONFIG.GAME.MAX_SPIN_ROUNDS - CONFIG.GAME.MIN_SPIN_ROUNDS) + CONFIG.GAME.MIN_SPIN_ROUNDS
-      const scrollWidth = prizeScroll.scrollWidth / 3 // Делим на 3, так как у нас 3 копии призов
-      const totalDistance = targetPosition - startPosition + extraSpins * scrollWidth
+      // Улучшенная функция замедления (более плавная)
+      const easeOutQuart = (t) => {
+        return 1 - Math.pow(1 - t, 4)
+      }
+
+      // Дополнительная функция для очень плавного замедления в конце
+      const smoothEnd = (t) => {
+        if (t < 0.8) {
+          return easeOutQuart(t / 0.8) * 0.95
+        } else {
+          // Очень медленное замедление в последние 20%
+          const endProgress = (t - 0.8) / 0.2
+          return 0.95 + 0.05 * (1 - Math.pow(1 - endProgress, 6))
+        }
+      }
 
       const animateScroll = (currentTime) => {
         const elapsed = currentTime - startTime
         const progress = Math.min(elapsed / duration, 1)
 
-        // Используем easing функцию для плавности
-        const easeOut = CONFIG.ANIMATION.EASING.EASE_IN_OUT_QUART(progress)
-        const currentPosition = startPosition + totalDistance * easeOut
+        // Применяем улучшенную функцию замедления
+        const easedProgress = smoothEnd(progress)
 
+        const currentPosition = startPosition + (finalTargetPosition - startPosition) * easedProgress
         prizeScroll.scrollLeft = currentPosition
+
+        // Добавляем эффект подсветки приближающегося к центру приза
+        const currentCenterPosition = currentPosition + centerOffset
+        const currentPrizeIndex = Math.round(currentCenterPosition / prizeWidth)
+
+        // Убираем предыдущую подсветку
+        prizeElements.forEach((el) => el.classList.remove("prize-highlight"))
+
+        // Подсвечиваем текущий приз в центре
+        if (prizeElements[currentPrizeIndex]) {
+          prizeElements[currentPrizeIndex].classList.add("prize-highlight")
+        }
 
         if (progress < 1) {
           requestAnimationFrame(animateScroll)
         } else {
-          // Подсвечиваем выигрышный приз
-          this.highlightWinningPrize(targetIndex)
+          // Финальная подсветка выигрышного приза
+          prizeElements.forEach((el) => el.classList.remove("prize-highlight"))
+          if (prizeElements[targetPrizeIndex]) {
+            prizeElements[targetPrizeIndex].classList.add("prize-winner")
+          }
 
           setTimeout(() => {
-            const prizeName = result.prize?.name || "приз"
-            const prizeValue = result.prize?.cost || 0
-            const profit = result.profit || 0
-
-            let message = `🎉 Поздравляем! Вы выиграли ${prizeName}!`
-            if (profit > 0) {
-              message += ` Прибыль: +${profit} 💎`
-            } else if (profit < 0) {
-              message += ` Убыток: ${profit} 💎`
-            }
-
-            showNotification(message, "success", 5000)
+            const prizeName = result.prize?.name || `${winningCost} фантиков`
+            showNotification(`🎉 Поздравляем! Вы выиграли ${prizeName}!`, "success", 5000)
             resolve()
-          }, 500)
+          }, 800)
         }
       }
 
       requestAnimationFrame(animateScroll)
     })
-  }
-
-  highlightWinningPrize(index) {
-    const prizeScroll = document.getElementById("prizeScroll")
-    if (!prizeScroll) return
-
-    const prizeElement = prizeScroll.children[index]
-    if (prizeElement) {
-      // Убираем предыдущие подсветки
-      Array.from(prizeScroll.children).forEach((el) => {
-        el.classList.remove("prize-winner", "prize-highlight")
-      })
-
-      // Добавляем анимацию победы
-      prizeElement.classList.add("prize-winner")
-
-      // Убираем анимацию через 3 секунды
-      setTimeout(() => {
-        prizeElement.classList.remove("prize-winner")
-      }, 3000)
-    }
   }
 
   goBack() {
