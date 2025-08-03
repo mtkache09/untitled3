@@ -8,8 +8,8 @@ export const CONFIG = {
   })(),
 
   ANIMATION: {
-    SPIN_DURATION: 3000,
-    PRIZE_WIDTH: 128,
+    SPIN_DURATION: 6000,
+    PRIZE_WIDTH: 144,
     NOTIFICATION_DURATION: 3000,
   },
 
