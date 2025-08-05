@@ -1,8 +1,18 @@
 {
   "url": "https://vladimiropaits.github.io/Casino/untitled3/",
   "name": "Fantics Casino - Telegram Mini App",
-  "iconUrl": "https://vladimiropaits.github.io/Casino/untitled3/icon-512.png",
-  "termsOfUseUrl": "https://vladimiropaits.github.io/Casino/untitled3/terms.html",
-  "privacyPolicyUrl": "https://vladimiropaits.github.io/Casino/untitled3/privacy.html",
-  "features": ["ton_addr", "ton_proof"]
-}
+  "iconUrl": "https://ton.org/download/ton_symbol.png",
+  "termsOfUseUrl": "https://vladimiropaits.github.io/Casino/untitled3/",
+  "privacyPolicyUrl": "https://vladimiropaits.github.io/Casino/untitled3/",
+  "features": ["ton_addr", "ton_proof"],
+  "items": [
+    {
+      "name": "ton_addr",
+      "description": "Request wallet address"
+    },
+    {
+      "name": "ton_proof",
+      "description": "Request TON proof for authentication"
+    }
+  ]
+} 
