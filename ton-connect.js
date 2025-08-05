@@ -6,10 +6,10 @@ import { showNotification, debugLog } from "./ui.js"
 export class TonConnectManager {
   constructor() {
     this.manifestUrls = [
-      window.location.origin + "/tonconnect-manifest.json",
-      "https://vladimiropaits.github.io/Casino/tonconnect-manifest.json",
-      "https://vladimiropaits.github.io/Casino/untitled3/tonconnect-manifest.json",
-    ]
+  window.location.origin + "/tonconnect-manifest.json",
+  "https://mtkache09.github.io/tonconnect-manifest.json", // ← Исправленный путь
+  "https://vladimiropaits.github.io/Casino/untitled3/tonconnect-manifest.json",
+]
   }
 
   async init() {
