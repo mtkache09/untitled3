@@ -141,6 +141,11 @@ export class PaymentManager {
     document.getElementById("topupModal")?.classList.add("hidden")
     STATE.topupPayload = null
     STATE.currentPaymentId = null
+    STATE.lastTransactionHash = null
+    
+    // Удаляем кнопку повторной проверки если есть
+    const retryBtn = document.getElementById('retryVerificationBtn')
+    if (retryBtn) retryBtn.remove()
   }
 
   resetTopupModal() {
@@ -153,6 +158,11 @@ export class PaymentManager {
     this.updatePaymentMethodUI()
     STATE.topupPayload = null
     STATE.currentPaymentId = null
+    STATE.lastTransactionHash = null
+    
+    // Удаляем кнопку повторной проверки если есть
+    const retryBtn = document.getElementById('retryVerificationBtn')
+    if (retryBtn) retryBtn.remove()
   }
 
   updatePaymentMethodUI() {
@@ -269,6 +279,9 @@ export class PaymentManager {
         const transactionHash = result.boc ? await this.getTransactionHash(result.boc) : null
         
         if (transactionHash) {
+          // Сохраняем хэш для возможной повторной проверки
+          STATE.lastTransactionHash = transactionHash
+          
           // Подтверждаем пополнение на бэкенде с реальной проверкой
           await this.confirmTopupWithVerification(transactionHash)
         } else {
@@ -406,9 +419,8 @@ export class PaymentManager {
         STATE.currentPaymentId = null
         STATE.topupPayload = null
       } else if (payment.status === 'failed') {
-        showNotification('❌ Платеж не прошел проверку', 'error')
-        STATE.currentPaymentId = null
-        STATE.topupPayload = null
+        // Показываем кнопку для повторной проверки
+        this.showRetryButton()
       } else if (payment.status === 'expired') {
         showNotification('⏰ Время платежа истекло', 'warning')
         STATE.currentPaymentId = null
@@ -421,6 +433,78 @@ export class PaymentManager {
     } catch (error) {
       console.error('Ошибка проверки статуса:', error)
       setTimeout(() => this.checkPaymentStatus(), 15000)
+    }
+  }
+
+  // Показать кнопку повторной проверки
+  showRetryButton() {
+    const topupModal = document.getElementById('topupModal')
+    if (!topupModal) return
+
+    // Удаляем старую кнопку если есть
+    const oldRetryBtn = document.getElementById('retryVerificationBtn')
+    if (oldRetryBtn) oldRetryBtn.remove()
+
+    // Создаем новую кнопку
+    const retryBtn = document.createElement('button')
+    retryBtn.id = 'retryVerificationBtn'
+    retryBtn.className = 'bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors'
+    retryBtn.innerHTML = '🔄 Повторить проверку транзакции'
+    retryBtn.onclick = () => this.retryPaymentVerification()
+
+    // Добавляем кнопку в модальное окно
+    const modalContent = topupModal.querySelector('.modal-content')
+    if (modalContent) {
+      modalContent.appendChild(retryBtn)
+    }
+  }
+
+  // Повторная проверка транзакции
+  async retryPaymentVerification() {
+    if (!STATE.currentPaymentId || !STATE.lastTransactionHash) {
+      showNotification('Ошибка: данные для повторной проверки не найдены', 'error')
+      return
+    }
+
+    try {
+      showNotification('🔄 Повторно проверяем транзакцию...', 'info')
+
+      const response = await fetch(`${CONFIG.API_BASE}/payment/retry_verification`, {
+        method: 'POST',
+        headers: telegramManager.getAuthHeaders(),
+        body: JSON.stringify({
+          payment_id: STATE.currentPaymentId,
+          transaction_hash: STATE.lastTransactionHash
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        showNotification(`✅ Транзакция подтверждена! +${result.new_balance} фантиков`, 'success')
+        this.closeTopupModal()
+        await apiManager.fetchUserFantics()
+        updateFanticsDisplay()
+        
+        // Очищаем данные
+        STATE.currentPaymentId = null
+        STATE.topupPayload = null
+        STATE.lastTransactionHash = null
+        
+        // Удаляем кнопку повторной проверки
+        const retryBtn = document.getElementById('retryVerificationBtn')
+        if (retryBtn) retryBtn.remove()
+        
+      } else {
+        const message = result.message || 'Транзакция все еще не подтверждена'
+        showNotification(`⏳ ${message}`, 'warning')
+        
+        // Продолжаем показывать кнопку для повторных попыток
+        setTimeout(() => this.retryPaymentVerification(), 5000)
+      }
+
+    } catch (error) {
+      showNotification('Ошибка повторной проверки: ' + error.message, 'error')
     }
   }
 }

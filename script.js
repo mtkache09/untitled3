@@ -36,7 +36,7 @@ class App {
       this.setupEventListeners()
 
       console.log("✅ Приложение успешно инициализировано")
-    } catch (error) {
+  } catch (error) {
       console.error("❌ Ошибка инициализации приложения:", error)
       showNotification("❌ Ошибка инициализации приложения", "error", 5000)
     }
@@ -47,7 +47,7 @@ class App {
       // Загружаем баланс пользователя
       const fantics = await apiManager.fetchUserFantics()
       if (fantics !== null) {
-        updateFanticsDisplay()
+      updateFanticsDisplay()
       }
 
       // Загружаем кейсы
@@ -114,7 +114,7 @@ class App {
         })
 
         renderCases(sortedCases, (caseData) => gameManager.openCasePage(caseData))
-      }
+           }
     } catch (error) {
       console.error("❌ Ошибка загрузки данных:", error)
       showNotification("❌ Ошибка загрузки данных", "error", 5000)
