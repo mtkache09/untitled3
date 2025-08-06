@@ -29,6 +29,7 @@ export const STATE = {
   userFantics: 0,
   selectedDepositAmount: null,
   topupPayload: null,
+  currentPaymentId: null,
 }
 
 export default { CONFIG, STATE }

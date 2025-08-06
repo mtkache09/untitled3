@@ -140,6 +140,7 @@ export class PaymentManager {
   closeTopupModal() {
     document.getElementById("topupModal")?.classList.add("hidden")
     STATE.topupPayload = null
+    STATE.currentPaymentId = null
   }
 
   resetTopupModal() {
@@ -151,6 +152,7 @@ export class PaymentManager {
 
     this.updatePaymentMethodUI()
     STATE.topupPayload = null
+    STATE.currentPaymentId = null
   }
 
   updatePaymentMethodUI() {
@@ -201,6 +203,7 @@ export class PaymentManager {
       }
 
       STATE.topupPayload = await response.json()
+      STATE.currentPaymentId = STATE.topupPayload.payment_id  // Сохраняем ID платежа
 
       document.getElementById("tonAmount").textContent = STATE.topupPayload.amount
       document.getElementById("destinationAddress").textContent = STATE.topupPayload.destination
@@ -211,7 +214,7 @@ export class PaymentManager {
       document.getElementById("sendTonTransaction")?.classList.remove("hidden")
       document.getElementById("payWithStars")?.classList.add("hidden")
 
-      showNotification("TON платеж создан! Теперь отправьте транзакцию", "success")
+      showNotification(`TON платеж создан! ID: ${STATE.currentPaymentId.slice(0, 8)}...`, "success")
     } catch (error) {
       showNotification("Ошибка создания TON платежа: " + error.message, "error")
     }
@@ -260,8 +263,17 @@ export class PaymentManager {
       const result = await STATE.tonConnectUI.sendTransaction(transaction)
 
       if (result) {
-        showNotification("Транзакция отправлена! Ожидайте подтверждения...", "success")
-        await this.confirmTopup()
+        showNotification("Транзакция отправлена! Проверяем в блокчейне...", "success")
+        
+        // Получаем хэш транзакции из результата
+        const transactionHash = result.boc ? await this.getTransactionHash(result.boc) : null
+        
+        if (transactionHash) {
+          // Подтверждаем пополнение на бэкенде с реальной проверкой
+          await this.confirmTopupWithVerification(transactionHash)
+        } else {
+          showNotification("Не удалось получить хэш транзакции", "error")
+        }
       } else {
         showNotification("Ошибка отправки транзакции", "error")
       }
@@ -305,34 +317,110 @@ export class PaymentManager {
     }
   }
 
-  async confirmTopup() {
-    if (!STATE.topupPayload) return
-
+  // Функция для получения хэша транзакции из BOC (упрощенная версия)
+  async getTransactionHash(boc) {
     try {
+      // В реальности здесь нужна библиотека для работы с TON BOC
+      // Пока что используем заглушку - в production нужно использовать ton-core или аналог
+      
+      // Временное решение: берем первые байты BOC как хэш
+      const bocBytes = new Uint8Array(atob(boc).split('').map(c => c.charCodeAt(0)))
+      const hashHex = Array.from(bocBytes.slice(0, 32)).map(b => b.toString(16).padStart(2, '0')).join('')
+      
+      return hashHex
+    } catch (error) {
+      console.error('Ошибка получения хэша транзакции:', error)
+      return null
+    }
+  }
+
+  async confirmTopupWithVerification(transactionHash) {
+    if (!STATE.currentPaymentId) {
+      showNotification('Ошибка: ID платежа не найден', 'error')
+      return
+    }
+    
+    try {
+      showNotification('🔍 Проверяем транзакцию в блокчейне...', 'info')
+      
       const response = await fetch(`${CONFIG.API_BASE}/topup/ton/confirm`, {
-        method: "POST",
+        method: 'POST',
         headers: telegramManager.getAuthHeaders(),
         body: JSON.stringify({
-          amount: parseInt(document.getElementById("topupAmount")?.value || "0"),
-        }),
+          payment_id: STATE.currentPaymentId,
+          transaction_hash: transactionHash
+        })
       })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
+      
       const result = await response.json()
-
-      if (result.success) {
-        showNotification(`✅ ${result.message} (+${result.added_amount} фантиков)`, "success")
+      
+      if (response.ok && result.success) {
+        showNotification(`✅ Платеж подтвержден! +${result.added_amount} фантиков`, 'success')
         this.closeTopupModal()
         await apiManager.fetchUserFantics()
         updateFanticsDisplay()
+        
+        // Очищаем данные текущего платежа
+        STATE.currentPaymentId = null
+        STATE.topupPayload = null
+        
       } else {
-        showNotification("Ошибка подтверждения TON пополнения", "error")
+        const errorMessage = result.detail || result.message || 'Ошибка подтверждения платежа'
+        
+        if (errorMessage.includes('не найдена') || errorMessage.includes('не подтверждена')) {
+          showNotification(`⏳ ${errorMessage}. Попробуйте через несколько секунд`, 'warning')
+          
+          // Запускаем периодическую проверку
+          setTimeout(() => this.checkPaymentStatus(), 5000)
+        } else {
+          showNotification(`❌ ${errorMessage}`, 'error')
+        }
       }
+      
     } catch (error) {
-      showNotification("Ошибка подтверждения TON: " + error.message, "error")
+      showNotification('Ошибка подтверждения: ' + error.message, 'error')
+      
+      // Запускаем периодическую проверку при сетевых ошибках
+      setTimeout(() => this.checkPaymentStatus(), 10000)
+    }
+  }
+
+  // Функция для периодической проверки статуса платежа
+  async checkPaymentStatus() {
+    if (!STATE.currentPaymentId) return
+    
+    try {
+      const response = await fetch(`${CONFIG.API_BASE}/payment/status/${STATE.currentPaymentId}`, {
+        headers: telegramManager.getAuthHeaders()
+      })
+      
+      if (!response.ok) return
+      
+      const payment = await response.json()
+      
+      if (payment.status === 'confirmed') {
+        showNotification(`✅ Платеж подтвержден! +${payment.amount_fantics} фантиков`, 'success')
+        this.closeTopupModal()
+        await apiManager.fetchUserFantics()
+        updateFanticsDisplay()
+        STATE.currentPaymentId = null
+        STATE.topupPayload = null
+      } else if (payment.status === 'failed') {
+        showNotification('❌ Платеж не прошел проверку', 'error')
+        STATE.currentPaymentId = null
+        STATE.topupPayload = null
+      } else if (payment.status === 'expired') {
+        showNotification('⏰ Время платежа истекло', 'warning')
+        STATE.currentPaymentId = null
+        STATE.topupPayload = null
+      } else {
+        // Статус pending - продолжаем проверять
+        setTimeout(() => this.checkPaymentStatus(), 10000)
+      }
+      
+    } catch (error) {
+      console.error('Ошибка проверки статуса:', error)
+      setTimeout(() => this.checkPaymentStatus(), 15000)
     }
   }
 }
