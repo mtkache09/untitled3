@@ -343,12 +343,19 @@ export class PaymentManager {
     try {
       showNotification('🔍 Проверяем транзакцию в блокчейне...', 'info')
       
+      // Получаем адрес кошелька отправителя из TON Connect
+      let senderWallet = null
+      if (STATE.tonConnectUI && STATE.tonConnectUI.wallet && STATE.tonConnectUI.wallet.account) {
+        senderWallet = STATE.tonConnectUI.wallet.account.address
+      }
+      
       const response = await fetch(`${CONFIG.API_BASE}/topup/ton/confirm`, {
         method: 'POST',
         headers: telegramManager.getAuthHeaders(),
         body: JSON.stringify({
           payment_id: STATE.currentPaymentId,
-          transaction_hash: transactionHash
+          transaction_hash: transactionHash,
+          sender_wallet: senderWallet
         })
       })
       

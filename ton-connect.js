@@ -43,9 +43,10 @@ export class TonConnectManager {
       STATE.tonConnectUI.onStatusChange((wallet) => {
         if (wallet && wallet.account) {
           debugLog(`✅ Кошелек подключен: ${wallet.account.address}`)
-          showNotification("✅ TON кошелек подключен", "success", 3000)
+          // Не показываем уведомление сразу, так как это может быть восстановление сессии
           this.processWalletConnection(wallet)
         } else {
+          debugLog("⚠️ Кошелек отключен")
           STATE.walletData = null
           this.updateConnectButton(false)
           showNotification("⚠️ TON кошелек отключен", "info", 3000)
@@ -123,7 +124,15 @@ export class TonConnectManager {
       }
 
       this.updateConnectButton(true, wallet.account.address)
-      await this.sendWalletToBackend()
+      
+      // Проверяем, не был ли кошелек уже обработан при инициализации
+      const wasAlreadyChecked = await this.checkExistingWallet(wallet.account.address)
+      if (!wasAlreadyChecked) {
+        debugLog("📤 Отправляем новый кошелек на сервер")
+        await this.sendWalletToBackend()
+      } else {
+        debugLog("✅ Кошелек уже был обработан при инициализации")
+      }
     } catch (error) {
       console.error("❌ Ошибка обработки подключения кошелька:", error)
       showNotification(`❌ Ошибка подключения кошелька: ${error.message}`, "error", 5000)
@@ -157,7 +166,7 @@ export class TonConnectManager {
 
   async sendWalletToBackend() {
     if (!STATE.walletData) {
-      showNotification("Нет данных кошелька для отправки", "warning")
+      debugLog("⚠️ Нет данных кошелька для отправки")
       return
     }
 
@@ -170,22 +179,28 @@ export class TonConnectManager {
       })
 
       if (response.ok) {
+        debugLog("✅ Кошелек успешно сохранен на сервере")
         showNotification("✅ TON кошелек подключен и сохранен!", "success", 3000)
       } else {
         const errorData = await response.json().catch(() => ({ detail: "Неизвестная ошибка" }))
+        debugLog(`❌ Ошибка сервера: ${errorData.detail}`)
+        
         if (errorData.detail && (errorData.detail.includes("уже") || errorData.detail.includes("already"))) {
+          debugLog("✅ Кошелек уже подключен (сервер)")
           showNotification("✅ TON кошелек уже подключен", "success", 3000)
         } else {
           showNotification(`❌ Ошибка сохранения кошелька: ${errorData.detail}`, "error", 5000)
         }
       }
     } catch (error) {
+      debugLog(`❌ Ошибка сети: ${error.message}`)
       showNotification("❌ Ошибка сети при сохранении кошелька", "error", 5000)
     }
   }
 
   async checkExistingWallet(walletAddress) {
     try {
+      debugLog(`🔍 Проверяем существующий кошелек: ${walletAddress}`)
       const response = await fetch(`${CONFIG.API_BASE}/ton/wallets`, {
         method: "GET",
         headers: telegramManager.getAuthHeaders()
@@ -196,6 +211,7 @@ export class TonConnectManager {
         const existingWallet = wallets.find((w) => w.wallet_address === walletAddress)
 
         if (existingWallet) {
+          debugLog(`✅ Кошелек уже подключен в базе данных: ${walletAddress}`)
           this.updateConnectButton(true, walletAddress)
           STATE.walletData = {
             wallet_address: walletAddress,
@@ -203,12 +219,26 @@ export class TonConnectManager {
             network: "-239",
             public_key: null
           }
-          showNotification("✅ TON кошелек уже подключен", "success", 3000)
+          // Не показываем уведомление, так как кошелек уже был подключен
+          return true
+        } else {
+          debugLog(`⚠️ Кошелек не найден в базе данных, отправляем на сервер: ${walletAddress}`)
+          // Если кошелек не найден в базе, но подключен в UI, отправляем его на сервер
+          STATE.walletData = {
+            wallet_address: walletAddress,
+            user_id: telegramManager.getUserId(),
+            network: "-239",
+            public_key: null
+          }
+          await this.sendWalletToBackend()
           return true
         }
+      } else {
+        debugLog(`❌ Ошибка получения списка кошельков: ${response.status}`)
+        return false
       }
-      return false
     } catch (error) {
+      debugLog(`❌ Ошибка проверки существующего кошелька: ${error.message}`)
       return false
     }
   }
