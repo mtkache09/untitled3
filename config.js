@@ -28,6 +28,7 @@ export const STATE = {
   isSpinning: false,
   userFantics: 0,
   selectedDepositAmount: null,
+  selectedWithdrawalAmount: null,
   topupPayload: null,
   currentPaymentId: null,
 }

@@ -3,6 +3,7 @@ import { apiManager } from "./api.js"
 import { tonConnectManager } from "./ton-connect.js"
 import { gameManager } from "./game.js"
 import { paymentManager } from "./payments.js"
+import { withdrawalManager } from "./withdrawal.js"
 import { showNotification, showConnectionStatus, renderCases, updateFanticsDisplay } from "./ui.js"
 
 class App {
