@@ -2,7 +2,7 @@
 export const CONFIG = {
   API_BASE: (() => {
     if (window.location.hostname === "mtkache09.github.io") {
-      return "https://p01--toncase--r9j8fhzj99mf.code.run"
+      return "https://telegramcases.onrender.com"
     }
     return "http://localhost:8000"
   })(),
