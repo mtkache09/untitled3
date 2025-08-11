@@ -6,8 +6,8 @@ import { showNotification, debugLog } from "./ui.js"
 export class TonConnectManager {
   constructor() {
     this.manifestFallbacks = [
-      "https://vladimiropaits.github.io/Casino/tonconnect-manifest.json",
-      "https://vladimiropaits.github.io/Casino/untitled3/tonconnect-manifest.json"
+      "https://mtkache09.github.io/untitled3/tonconnect-manifest.json",
+      "https://mtkache09.github.io/untitled3/tonconnect-manifest.json"
     ]
   }
 
