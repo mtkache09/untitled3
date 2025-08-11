@@ -8,18 +8,25 @@ import { showNotification, showConnectionStatus, renderCases, updateFanticsDispl
 
 class App {
   constructor() {
+    console.log("🚀 Инициализация приложения...");
     this.init()
   }
 
   async init() {
     try {
+      console.log("🔧 Начинаем инициализацию...");
+      
       // Показываем предупреждение если нет авторизации
-     if (!telegramManager.isAuthAvailable()) {
-  showNotification("⚠️ Для полной функциональности откройте в Telegram", "info", 8000)
+      if (!telegramManager.isAuthAvailable()) {
+        console.log("⚠️ Telegram авторизация недоступна");
+        showNotification("⚠️ Для полной функциональности откройте в Telegram", "info", 8000)
+      } else {
+        console.log("✅ Telegram авторизация доступна");
       }
 
       // Запускаем тест соединения для отладки
       if (window.location.search.includes("debug=true")) {
+        console.log("🐛 Режим отладки включен");
         const connectionOk = await apiManager.testConnection()
         showConnectionStatus(
           connectionOk ? "✅ Соединение с сервером установлено" : "❌ Ошибка соединения с сервером",
@@ -28,46 +35,64 @@ class App {
       }
 
       // Инициализируем TON Connect
+      console.log("🔗 Инициализация TON Connect...");
       await tonConnectManager.init()
 
       // Загружаем данные
+      console.log("📊 Загрузка начальных данных...");
       await this.loadInitialData()
 
       // Настраиваем обработчики событий
+      console.log("🎯 Настройка обработчиков событий...");
       this.setupEventListeners()
 
       console.log("✅ Приложение успешно инициализировано")
-  } catch (error) {
+    } catch (error) {
       console.error("❌ Ошибка инициализации приложения:", error)
+      console.error("🔍 Детали ошибки:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       showNotification("❌ Ошибка инициализации приложения", "error", 5000)
     }
   }
 
   async loadInitialData() {
     try {
+      console.log("📊 Начинаем загрузку начальных данных...");
+      
       // Загружаем баланс пользователя
+      console.log("💰 Загружаем баланс пользователя...");
       const fantics = await apiManager.fetchUserFantics()
       if (fantics !== null) {
-      updateFanticsDisplay()
+        console.log("✅ Баланс загружен:", fantics);
+        updateFanticsDisplay()
+      } else {
+        console.log("⚠️ Баланс не загружен");
       }
 
       // Загружаем кейсы
+      console.log("📦 Загружаем кейсы...");
       const cases = await apiManager.fetchCases()
       if (cases) {
+        console.log("✅ Кейсы загружены, количество:", cases.length);
+        
         // Обрабатываем кейсы: добавляем иконки и призы
         const processedCases = cases.map((caseData) => {
           const name = caseData.name.toLowerCase()
 
           // Определяем иконку в зависимости от названия
-         let iconUrl = "images/starter-case-icon.png" // По умолчанию стартовый (убираем слеш)
+          let iconUrl = "images/starter-case-icon.png" // По умолчанию стартовый
 
-        if (name.includes("стартовый") || name.includes("starter")) {
-  iconUrl = "images/starter-case-icon.png"  // убираем слеш
-} else if (name.includes("премиум") || name.includes("premium")) {
-  iconUrl = "images/premium-case-icon.png"  // убираем слеш
-} else if (name.includes("vip") || name.includes("вип")) {
-  iconUrl = "images/vip-case-icon.png"     // убираем слеш
-}
+          if (name.includes("стартовый") || name.includes("starter")) {
+            iconUrl = "images/starter-case-icon.png"
+          } else if (name.includes("премиум") || name.includes("premium")) {
+            iconUrl = "images/premium-case-icon.png"
+          } else if (name.includes("vip") || name.includes("вип")) {
+            iconUrl = "images/vip-case-icon.png"
+          }
+          
           // Создаем призы если их нет
           let possible_prizes = caseData.possible_prizes || []
 
@@ -102,7 +127,7 @@ class App {
 
           return {
             ...caseData,
-            iconUrl: iconUrl, // Используем URL изображения
+            iconUrl: iconUrl,
             possible_prizes: possible_prizes,
           }
         })
@@ -114,10 +139,21 @@ class App {
           return a.cost - b.cost
         })
 
+        console.log("🎯 Рендерим кейсы...");
         renderCases(sortedCases, (caseData) => gameManager.openCasePage(caseData))
-           }
+        console.log("✅ Кейсы отрендерены");
+      } else {
+        console.log("⚠️ Кейсы не загружены");
+      }
+      
+      console.log("✅ Загрузка начальных данных завершена");
     } catch (error) {
       console.error("❌ Ошибка загрузки данных:", error)
+      console.error("🔍 Детали ошибки:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       showNotification("❌ Ошибка загрузки данных", "error", 5000)
     }
   }

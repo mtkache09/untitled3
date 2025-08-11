@@ -1,10 +1,18 @@
 // Конфигурация приложения
 export const CONFIG = {
   API_BASE: (() => {
-    if (window.location.hostname === "mtkache09.github.io") {
-      return "https://p01--telegrambackend--29cdb8b4bnhv.code.run"
+    const hostname = window.location.hostname;
+    console.log("🔍 Текущий hostname:", hostname);
+    
+    if (hostname === "mtkache09.github.io") {
+      const apiUrl = "https://p01--telegrambackend--29cdb8b4bnhv.code.run";
+      console.log("🌐 Используем продакшен API:", apiUrl);
+      return apiUrl;
+    } else {
+      const localUrl = "http://localhost:8000";
+      console.log("🏠 Используем локальный API:", localUrl);
+      return localUrl;
     }
-    return "http://localhost:8000"
   })(),
 
   ANIMATION: {
@@ -32,5 +40,11 @@ export const STATE = {
   topupPayload: null,
   currentPaymentId: null,
 }
+
+// Отладочная информация при загрузке
+console.log("🚀 Конфигурация загружена:");
+console.log("📍 API_BASE:", CONFIG.API_BASE);
+console.log("🌍 Hostname:", window.location.hostname);
+console.log("🔗 Полный URL:", window.location.href);
 
 export default { CONFIG, STATE }
